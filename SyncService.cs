@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace StudyAssistant;
+namespace FlowState;
 
 // Bu cihazın senkron durumu (data.json'dan ayrı; cihaza özel).
 public class SyncConfig

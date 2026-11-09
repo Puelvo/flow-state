@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace StudyAssistant;
+namespace FlowState;
 
 /// <summary>Windows: oturum anahtarını kullanıcı hesabına bağlı DPAPI ile şifreler (mevcut sync.json ile uyumlu).</summary>
 public sealed class WindowsSecretCodec : ISecretCodec

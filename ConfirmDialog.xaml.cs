@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace StudyAssistant;
+namespace FlowState;
 
 /// <summary>Uygulamanın tasarım diline uyan onay / bilgi penceresi (MessageBox yerine).</summary>
 public partial class ConfirmDialog : Window

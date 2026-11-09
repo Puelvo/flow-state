@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace StudyAssistant;
+namespace FlowState;
 
 public class Course
 {
@@ -64,9 +64,22 @@ public class AppData
 
 public static class Store
 {
-    /// <summary>Veri klasörü. Windows'ta %APPDATA%\StudyAssistant; Android uygulaması başlangıçta değiştirir.</summary>
-    public static string Dir { get; set; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StudyAssistant");
+    /// <summary>Veri klasörü. Windows'ta %APPDATA%\FlowState; Android uygulaması başlangıçta değiştirir.</summary>
+    public static string Dir { get; set; } = DefaultDir();
+
+    static string DefaultDir()
+    {
+        var root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var dir = Path.Combine(root, "FlowState");
+        var legacy = Path.Combine(root, "StudyAssistant"); // uygulamanın eski adı
+        try
+        {
+            // Tek seferlik taşıma: eski ad altındaki kayıtlar ve senkron girişi korunur.
+            if (!Directory.Exists(dir) && Directory.Exists(legacy)) Directory.Move(legacy, dir);
+        }
+        catch { /* taşınamazsa yeni klasörle devam; eski veri yerinde kalır */ }
+        return dir;
+    }
     static string FilePath => Path.Combine(Dir, "data.json");
     static readonly JsonSerializerOptions Opt = new() { WriteIndented = true };
 

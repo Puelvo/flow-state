@@ -10,7 +10,7 @@ Windows için ders çalışma süresi takip uygulaması (WPF, .NET 9).
 - Ders ekle/sil (üstteki ders çipleri), başlat / duraklat / bitir, Boşluk tuşu kısayolu
 - **İstatistik:** bugün / hafta / ay / toplam süre, günlük hedef ve seri, döneme göre ders dağılımı, son 14 gün grafiği
 - **Geçmiş:** oturum listesi, tek tek silme, CSV (Excel) dışa aktarma
-- Veriler `%APPDATA%\StudyAssistant\data.json` içinde saklanır; 15 sn'de bir otomatik kayıt, çökme olsa bile oturum kaybolmaz
+- Veriler `%APPDATA%\FlowState\data.json` içinde saklanır; 15 sn'de bir otomatik kayıt, çökme olsa bile oturum kaybolmaz
 
 ## Geliştirme
 `dotnet run` ile çalıştır, `dotnet publish -c Release -o dist` ile yeniden paketle.

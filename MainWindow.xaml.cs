@@ -9,7 +9,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
 
-namespace StudyAssistant;
+namespace FlowState;
 
 public partial class MainWindow : Window
 {

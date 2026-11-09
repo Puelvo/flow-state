@@ -9,7 +9,7 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
     <AssemblyName>FlowState</AssemblyName>
     <Product>Flow State</Product>
-    <RootNamespace>StudyAssistant</RootNamespace>
+    <RootNamespace>FlowState</RootNamespace>
   </PropertyGroup>
 
   <!-- Android (MAUI) projesi Mobile klasöründe; Windows derlemesine karışmasın -->
