@@ -131,7 +131,7 @@ public static class TimerWidget
 		return new AG.Color(r, g, b);
 	}
 
-	static AG.Bitmap RingBitmap(double frac, AG.Color accent)
+	internal static AG.Bitmap RingBitmap(double frac, AG.Color accent)
 	{
 		const int size = 280;
 		var bmp = AG.Bitmap.CreateBitmap(size, size, AG.Bitmap.Config.Argb8888!)!;
@@ -160,7 +160,7 @@ public static class TimerWidget
 	}
 
 	// 0 oynat, 1 duraklat, 2 bitir
-	static AG.Bitmap ButtonBitmap(int kind, AG.Color accent)
+	internal static AG.Bitmap ButtonBitmap(int kind, AG.Color accent)
 	{
 		const int size = 120;
 		var bmp = AG.Bitmap.CreateBitmap(size, size, AG.Bitmap.Config.Argb8888!)!;

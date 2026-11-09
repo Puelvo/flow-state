@@ -1,6 +1,7 @@
 using Android.App;
 using Android.Content;
 using Android.OS;
+using Android.Widget;
 using AndroidX.Core.App;
 
 namespace FlowState.Mobile;
@@ -43,28 +44,37 @@ public static class TimerNotifier
 			var openIntent = new Intent(ctx, typeof(MainActivity)).SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
 			var open = PendingIntent.GetActivity(ctx, 0, openIntent, PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent);
 
-			var b = new NotificationCompat.Builder(ctx, ChannelId)
-				.SetSmallIcon(ctx.ApplicationInfo!.Icon)
-				.SetContentTitle(string.IsNullOrEmpty(course) ? "Flow State" : course)
-				.SetOngoing(true)
-				.SetOnlyAlertOnce(true)
-				.SetVisibility(NotificationCompat.VisibilityPublic)
-				.SetContentIntent(open);
+				string title = string.IsNullOrEmpty(course) ? "Flow State" : course;
 
-			if (running)
-			{
-				long startMs = Java.Lang.JavaSystem.CurrentTimeMillis() - (long)(elapsedSec * 1000);
-				b.SetContentText("Odaklanıyorsun").SetUsesChronometer(true).SetShowWhen(true).SetWhen(startMs);
-			}
-			else
-			{
-				int s = (int)elapsedSec;
-				b.SetContentText($"Duraklatıldı · {s / 3600:00}:{s % 3600 / 60:00}:{s % 60:00}").SetShowWhen(false);
-			}
+				Store.Dir = Microsoft.Maui.Storage.FileSystem.AppDataDirectory;
+				Android.Graphics.Color accent;
+				try { accent = Android.Graphics.Color.ParseColor(Store.Load().WidgetColor); } catch { accent = Android.Graphics.Color.ParseColor("#5B8CFF"); }
 
-			b.AddAction(0, running ? "Duraklat" : "Devam et", Broadcast(ActToggle, 1));
-			b.AddAction(0, "Bitir", Broadcast(ActFinish, 2));
-			NotificationManagerCompat.From(ctx).Notify(NotifId, b.Build()!);
+				int Id(string n) => ctx.Resources!.GetIdentifier(n, "id", ctx.PackageName);
+				var v = new RemoteViews(ctx.PackageName, ctx.Resources!.GetIdentifier("notif_timer", "layout", ctx.PackageName));
+				v.SetImageViewBitmap(Id("n_ring"), TimerWidget.RingBitmap(elapsedSec % 3600 / 3600.0, accent));
+				v.SetTextViewText(Id("n_course"), title);
+				v.SetTextColor(Id("n_time"), accent);
+				long baseMs = SystemClock.ElapsedRealtime() - (long)(elapsedSec * 1000);
+				v.SetChronometer(Id("n_time"), baseMs, null, running);
+				v.SetImageViewBitmap(Id("n_toggle"), TimerWidget.ButtonBitmap(running ? 1 : 0, accent));
+				v.SetImageViewBitmap(Id("n_stop"), TimerWidget.ButtonBitmap(2, accent));
+				v.SetOnClickPendingIntent(Id("n_toggle"), Broadcast(ActToggle, 1));
+				v.SetOnClickPendingIntent(Id("n_stop"), Broadcast(ActFinish, 2));
+
+				var b = new NotificationCompat.Builder(ctx, ChannelId)
+					.SetSmallIcon(ctx.ApplicationInfo!.Icon)
+					.SetContentTitle(title)
+					.SetStyle(new NotificationCompat.DecoratedCustomViewStyle())
+					.SetCustomContentView(v)
+					.SetCustomBigContentView(v)
+					.SetColor(accent.ToArgb())
+					.SetOngoing(true)
+					.SetOnlyAlertOnce(true)
+					.SetShowWhen(false)
+					.SetVisibility(NotificationCompat.VisibilityPublic)
+					.SetContentIntent(open);
+				NotificationManagerCompat.From(ctx).Notify(NotifId, b.Build()!);
 		}
 		catch { /* izin verilmediyse ya da cihaz reddederse uygulama çalışmaya devam eder */ }
 	}
