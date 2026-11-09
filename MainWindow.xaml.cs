@@ -66,6 +66,7 @@ public partial class MainWindow : Window
             onRemoteLive: OnRemoteLive);
         sync.StatusChanged += RefreshSyncUi;
         RefreshSyncUi();
+        InitSocialBadge();
         if (data.Live.Active && data.Courses.Any(c => c.Id == data.Live.CourseId)) { ApplyLiveLocal(data.Live); UpdateAll(); }
     }
 
@@ -538,10 +539,12 @@ public partial class MainWindow : Window
 
     void Nav_Checked(object sender, RoutedEventArgs e)
     {
-        if (TimerView == null || StatsView == null || HistoryView == null || SettingsView == null || !ready) return;
+        if (TimerView == null || StatsView == null || HistoryView == null || SettingsView == null || SocialView == null || !ready) return;
         TimerView.Visibility = NavTimer.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         StatsView.Visibility = NavStats.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         HistoryView.Visibility = NavHistory.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        SocialView.Visibility = NavSocial.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        SocialShown(SocialView.Visibility == Visibility.Visible);
         SettingsView.Visibility = NavSettings.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         if (SettingsView.Visibility == Visibility.Visible) BuildSettings();
         UpdateAll();

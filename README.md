@@ -22,3 +22,6 @@ Ders çalışma süresi takip uygulaması: Windows (WPF, .NET 9) + Android (MAUI
 - Android: proje yolundaki Türkçe karakter (`Masaüstü`) aapt2'yi bozar. Kaynağı ASCII bir klasöre kopyala (bin/obj/dist/.git hariç), `Mobile` klasöründe şunu çalıştır:
   `dotnet publish -f net9.0-android -c Release -p:AndroidSdkDirectory=<Android SDK yolu>`
   Çıktı: `Mobile\bin\Release\net9.0-android\publish\com.puelvo.flowstate-Signed.apk` → `dist\FlowState.apk`.
+
+## Sosyal özellikler için Supabase kurulumu (bir kez)
+Supabase panelinde **SQL Editor**'e `supabase/live_session.sql`, ardından `supabase/social.sql` içeriğini yapıştırıp çalıştır. Kurulmadıysa Sosyal sekmesi bunu söyler. Tablolara doğrudan erişim kapalıdır; her şey, çağıranın kim olduğunu ve arkadaş/üye olup olmadığını denetleyen fonksiyonlardan geçer. Çevrimiçi durumu, seans sürerken ~45 sn'de bir gönderilen sinyale dayanır; 5 dakika sinyal gelmezse kişi çevrimdışı görünür.

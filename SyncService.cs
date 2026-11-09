@@ -25,6 +25,12 @@ public interface ISecretCodec
     string Unprotect(string stored);
 }
 
+/// <summary>Sosyal RPC hatası; Message sunucudaki hata kodudur (örn. "username_taken").</summary>
+public sealed class SocialException : Exception
+{
+    public SocialException(string code) : base(code) { }
+}
+
 /// <summary>
 /// Yerel-öncelikli senkron: uygulama her zaman yerel veriyle çalışır; bu servis arka planda
 /// (çek → birleştir → gönder) yapar. Çakışmada kayıt başına "son yazan kazanır" (UpdatedAt).
@@ -419,6 +425,7 @@ public sealed class SyncService
         try
         {
             do { livePending = false; await LiveOnceAsync(); } while (livePending);
+            await HeartbeatAsync();
         }
         catch { /* live_session tablosu yoksa ya da bağlantı yoksa sessizce atla; ana senkronu etkilemez */ }
         finally { liveGate.Release(); }
@@ -461,6 +468,50 @@ public sealed class SyncService
                 "resolution=merge-duplicates,return=minimal");
             liveSentAt = U(local.UpdatedAt);
         }
+    }
+
+    // Seans sürerken "cihaz açık" sinyali: arkadaşlar/odalar çevrimiçi durumunu buna bakarak gösterir.
+    DateTime lastBeat = DateTime.MinValue, lastBeatSent = DateTime.MinValue;
+
+    async Task HeartbeatAsync()
+    {
+        if (!await OnUi(() => data.Live.Active)) return;
+        if (DateTime.UtcNow - lastBeat < TimeSpan.FromSeconds(40) && lastBeatSent == liveSentAt) return;
+        lastBeat = DateTime.UtcNow; lastBeatSent = liveSentAt;
+        try { await RpcAsync("social_heartbeat"); } catch { /* sosyal şema kurulu değilse sessizce atla */ }
+    }
+
+    // ---------- sosyal (arkadaş / oda) RPC ----------
+
+    /// <summary>Supabase'deki bir "social_*" fonksiyonunu çağırır. Hata kodunu SocialException olarak fırlatır.</summary>
+    public async Task<JsonNode?> RpcAsync(string fn, JsonObject? args = null)
+    {
+        if (!SignedIn) throw new SocialException("not_signed_in");
+        if (!await EnsureTokenAsync()) throw new SocialException("offline");
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/rest/v1/rpc/{fn}")
+        { Content = new StringContent((args ?? new JsonObject()).ToJsonString(), Encoding.UTF8, "application/json") };
+        req.Headers.Add("apikey", ApiKey);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        string text; System.Net.HttpStatusCode code;
+        try
+        {
+            using var res = await Http.SendAsync(req);
+            text = await res.Content.ReadAsStringAsync();
+            code = res.StatusCode;
+            if (res.IsSuccessStatusCode) return text.Trim().Length == 0 ? null : JsonNode.Parse(text);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) { throw new SocialException("offline"); }
+
+        string msg = text;
+        try
+        {
+            var o = JsonNode.Parse(text) as JsonObject;
+            msg = o?["message"]?.ToString() ?? text;
+            if (o?["code"]?.ToString() is "PGRST202" or "42883") msg = "schema_missing";
+        }
+        catch { }
+        if (code == System.Net.HttpStatusCode.NotFound) msg = "schema_missing";
+        throw new SocialException(msg);
     }
 
     // ---------- yardımcılar ----------

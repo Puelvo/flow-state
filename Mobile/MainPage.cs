@@ -4,7 +4,7 @@ using Microsoft.Maui.Controls.Shapes;
 namespace FlowState.Mobile;
 
 /// <summary>Masaüstü Flow State tasarımının mobil karşılığı: koyu gradyan zemin, parlayan halka, hap sekmeler, kartlar.</summary>
-public class MainPage : ContentPage
+public partial class MainPage : ContentPage
 {
 	// ---------- tema ----------
 	static readonly Color Text = Color.FromArgb("#EEF1FF"), Muted = Color.FromArgb("#8791B5"),
@@ -35,9 +35,10 @@ public class MainPage : ContentPage
 	// ---------- görünüm öğeleri ----------
 	readonly Grid root = new();
 	readonly Grid body = new();
-	readonly View[] views = new View[4];
-	readonly Border[] navItems = new Border[4];
-	readonly Label[] navLabels = new Label[4];
+	readonly View[] views = new View[NavCount];
+	readonly Border[] navItems = new Border[NavCount];
+	readonly Label[] navLabels = new Label[NavCount];
+	const int NavCount = 5, SocialTab = 3, SettingsTab = 4;
 	int tab;
 	readonly IDispatcherTimer ticker;
 
@@ -125,7 +126,8 @@ public class MainPage : ContentPage
 		views[0] = BuildTimerView();
 		views[1] = Scroll(new VerticalStackLayout { Padding = new Thickness(20, 8, 20, 24), Children = { Lbl("İstatistikler", 26, true), statsBox } });
 		views[2] = Scroll(new VerticalStackLayout { Padding = new Thickness(20, 8, 20, 24), Children = { Lbl("Geçmiş", 26, true), BuildHistoryTools(), historyBox } });
-		views[3] = BuildSettingsView();
+		views[SocialTab] = BuildSocialView();
+		views[SettingsTab] = BuildSettingsView();
 		foreach (var v in views) { v.IsVisible = false; body.Children.Add(v); }
 
 		root.RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) };
@@ -141,7 +143,7 @@ public class MainPage : ContentPage
 		ticker.Start();
 
 		ApplyTheme();
-		ShowTab(sync.SignedIn || data.Courses.Any(c => c.Id != Course.GeneralId) ? 0 : 3);
+		ShowTab(sync.SignedIn || data.Courses.Any(c => c.Id != Course.GeneralId) ? 0 : SettingsTab);
 		SyncNotification();
 	}
 
@@ -178,15 +180,15 @@ public class MainPage : ContentPage
 		blob3.Background = Glow(accent, 0.30); blob4.Background = Glow(Tint(accent, 0.75, 0), 0.20);
 		ring.Accent = accent; startIcon.Color = Color.FromArgb("#0A0E1A"); stopIcon.Color = Text;
 		if (startBtn != null) startBtn.BackgroundColor = accent;
-		for (int i = 0; i < 4; i++) StyleNav(i);
+		for (int i = 0; i < NavCount; i++) StyleNav(i);
 		ringView.Invalidate();
 	}
 
 	Border BuildNav()
 	{
-		string[] names = { "Çalış", "İstatistik", "Geçmiş", "Ayarlar" };
-		var row = new Grid { ColumnSpacing = 2, ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star) } };
-		for (int i = 0; i < 4; i++)
+		string[] names = { "Çalış", "İstatistik", "Geçmiş", "Sosyal", "Ayarlar" };
+		var row = new Grid { ColumnSpacing = 2, ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star) } };
+		for (int i = 0; i < NavCount; i++)
 		{
 			int idx = i;
 			navLabels[i] = Lbl(names[i], 13, true, Muted);
@@ -194,7 +196,7 @@ public class MainPage : ContentPage
 			navItems[i] = new Border
 			{
 				BackgroundColor = Colors.Transparent, StrokeThickness = 0, HeightRequest = 42, Padding = new Thickness(4, 0),
-				StrokeShape = new RoundRectangle { CornerRadius = 21 }, Content = navLabels[i]
+				StrokeShape = new RoundRectangle { CornerRadius = 21 }, Content = i == SocialTab ? new Grid { Children = { navLabels[i], socialBadge } } : navLabels[i]
 			};
 			Tap(navItems[i], () => ShowTab(idx));
 			row.Add(navItems[i], i, 0);
@@ -291,7 +293,7 @@ public class MainPage : ContentPage
 		if (!data.Courses.Any(c => c.Id != Course.GeneralId))
 		{
 			var add = Pill("＋ İlk dersini ekle", true);
-			Tap(add, () => ShowTab(3));
+			Tap(add, () => ShowTab(SettingsTab));
 			chips.Children.Add(add);
 		}
 	}
@@ -749,7 +751,8 @@ public class MainPage : ContentPage
 	void ShowTab(int i)
 	{
 		tab = i;
-		for (int k = 0; k < 4; k++) { views[k].IsVisible = k == i; StyleNav(k); }
+		for (int k = 0; k < NavCount; k++) { views[k].IsVisible = k == i; StyleNav(k); }
+		SocialVisible(i == SocialTab);
 		RefreshAll();
 	}
 
@@ -758,7 +761,8 @@ public class MainPage : ContentPage
 		RefreshChips(); RefreshTimer(); RefreshSyncDot();
 		if (tab == 1) RefreshStats();
 		if (tab == 2) RefreshHistory();
-		if (tab == 3) { RefreshSettings(); RefreshAccount(); }
+		if (tab == SocialTab) RefreshSocial();
+		if (tab == SettingsTab) { RefreshSettings(); RefreshAccount(); }
 	}
 
 	void Changed()
@@ -955,7 +959,7 @@ public class MainPage : ContentPage
 		if (++persistCounter >= 15) { persistCounter = 0; PersistTimer(); }
 	}
 
-	public void OnResumed() { RefreshAll(); _ = sync.SyncAsync(); }
+	public void OnResumed() { RefreshAll(); _ = sync.SyncAsync(); _ = CheckPending(); }
 	public void OnStopped() { PersistTimer(); Store.Save(data); }
 
 	// ---------- çizimler ----------
