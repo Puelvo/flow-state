@@ -9,6 +9,9 @@ public class Course
     public string Name { get; set; } = "";
     public string Color { get; set; } = "#4F8CFF";
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow; // senkron için (UTC)
+
+    /// <summary>"Genel": derse bağlı olmayan çalışmalar için sabit kimlikli, silinemeyen ders (her cihazda aynı kimlik).</summary>
+    public const string GeneralId = "00000000000000000000000000000001";
 }
 
 public class Session
@@ -51,8 +54,16 @@ public class AppData
         foreach (var s in Sessions.Where(x => match(x)).ToList()) DeleteSession(s);
     }
 
+    /// <summary>Derssiz çalışma için "Genel" dersi yoksa başa ekler.</summary>
+    public void EnsureGeneral()
+    {
+        if (Courses.Any(c => c.Id == Course.GeneralId)) return;
+        Courses.Insert(0, new Course { Id = Course.GeneralId, Name = "Genel", Color = "#8791B5" });
+    }
+
     public void DeleteCourse(Course c)
     {
+        if (c.Id == Course.GeneralId) return;
         DeleteSessions(s => s.CourseId == c.Id);
         if (Courses.Remove(c)) Tombstones.Add(new Tombstone { Id = c.Id, Kind = "course" });
     }
@@ -84,6 +95,13 @@ public static class Store
     static readonly JsonSerializerOptions Opt = new() { WriteIndented = true };
 
     public static AppData Load()
+    {
+        var d = LoadCore();
+        d.EnsureGeneral();
+        return d;
+    }
+
+    static AppData LoadCore()
     {
         try
         {

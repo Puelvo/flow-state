@@ -132,17 +132,7 @@
                       PreviewMouseLeftButtonDown="Ring_Down" MouseMove="Ring_Move" MouseLeftButtonUp="Ring_Up">
                     <Grid Width="300" Height="300">
                         <Ellipse Width="300" Height="300" Stroke="#30FFFFFF" StrokeThickness="20"/>
-                        <Path x:Name="RingArc" Width="300" Height="300" StrokeThickness="20"
-                              Stroke="{DynamicResource Accent}" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                              Visibility="Collapsed">
-                            <Path.Data>
-                                <PathGeometry>
-                                    <PathFigure x:Name="RingFigure" StartPoint="150,10">
-                                        <ArcSegment x:Name="RingSeg" Size="140,140" SweepDirection="Clockwise" Point="150,10"/>
-                                    </PathFigure>
-                                </PathGeometry>
-                            </Path.Data>
-                        </Path>
+                        <Canvas x:Name="RingArc" Width="300" Height="300" Visibility="Collapsed"/>
                     </Grid>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="200">
                         <TextBlock x:Name="TimerCourseName" Text="Bir ders seç" FontSize="24" FontWeight="SemiBold"
@@ -151,6 +141,10 @@
                                    TextAlignment="Center" Margin="0,6,0,0"/>
                     </StackPanel>
                 </Grid>
+
+                <!-- Çalışma süresi (çemberin altında) -->
+                <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="38" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" Margin="0,14,0,0"/>
 
                 <!-- Tamamlanan saatler -->
                 <StackPanel x:Name="HourPips" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0" Height="14"/>
@@ -200,6 +194,9 @@
                     </StackPanel>
                 </Border>
 
+                <TextBlock Text="SERİ" Style="{StaticResource H}"/>
+                <UniformGrid x:Name="StreakCards" Columns="3" Margin="0,0,-10,0"/>
+
                 <TextBlock Text="DERS BAZINDA DAĞILIM" Style="{StaticResource H}"/>
                 <StackPanel Orientation="Horizontal" Margin="-3,0,0,14">
                     <RadioButton GroupName="seg" Style="{StaticResource Nav}" Content="Bugün" Tag="today" IsChecked="True" Padding="14,6" FontSize="13" Checked="Seg_Checked"/>
@@ -212,6 +209,27 @@
                 <TextBlock Text="SON 14 GÜN" Style="{StaticResource H}"/>
                 <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="16,18,16,12">
                     <UniformGrid x:Name="ChartGrid" Columns="14" Height="210"/>
+                </Border>
+
+                <TextBlock Text="SON 18 HAFTA · ISI HARİTASI" Style="{StaticResource H}"/>
+                <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="18,16,18,14">
+                    <StackPanel>
+                        <UniformGrid x:Name="HeatGrid" Rows="7" Columns="18"/>
+                        <DockPanel Margin="0,10,0,0">
+                            <StackPanel x:Name="HeatLegend" DockPanel.Dock="Right" Orientation="Horizontal"/>
+                            <TextBlock Text="Her kare bir gün; koyu = hedefe yakın / hedefi aşan" Foreground="{StaticResource Muted}" FontSize="12"/>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="HAFTALIK TOPLAM · SON 8 HAFTA" Style="{StaticResource H}"/>
+                <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="16,18,16,12">
+                    <UniformGrid x:Name="WeekGrid" Columns="8" Height="210"/>
+                </Border>
+
+                <TextBlock Text="GÜNÜN SAATLERİ · NE ZAMAN ÇALIŞIYORSUN" Style="{StaticResource H}"/>
+                <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="16,18,16,12">
+                    <UniformGrid x:Name="HourGrid" Columns="24" Height="190"/>
                 </Border>
             </StackPanel>
         </ScrollViewer>

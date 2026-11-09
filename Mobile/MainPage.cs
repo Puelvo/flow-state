@@ -110,6 +110,7 @@ public class MainPage : ContentPage
 	// ---------- kurulum ----------
 	public MainPage()
 	{
+		Current = this;
 		Store.Dir = FileSystem.AppDataDirectory;
 		data = Store.Load();
 		RestoreTimer();
@@ -140,7 +141,8 @@ public class MainPage : ContentPage
 		ticker.Start();
 
 		ApplyTheme();
-		ShowTab(sync.SignedIn || data.Courses.Count > 0 ? 0 : 3);
+		ShowTab(sync.SignedIn || data.Courses.Any(c => c.Id != Course.GeneralId) ? 0 : 3);
+		SyncNotification();
 	}
 
 	static ScrollView Scroll(View v) => new() { Content = v };
@@ -286,7 +288,7 @@ public class MainPage : ContentPage
 			});
 			chips.Children.Add(chip);
 		}
-		if (data.Courses.Count == 0)
+		if (!data.Courses.Any(c => c.Id != Course.GeneralId))
 		{
 			var add = Pill("＋ İlk dersini ekle", true);
 			Tap(add, () => ShowTab(3));
@@ -402,6 +404,15 @@ public class MainPage : ContentPage
 			}
 		}, 18));
 
+		// seri
+		statsBox.Children.Add(Head("SERİ"));
+		int streak = Streak(per);
+		var sGrid = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star), new(GridLength.Star) } };
+		var sItems = new[] { ("Güncel", $"🔥 {streak} gün"), ("En uzun", $"{Math.Max(streak, StatsMath.LongestStreak(per))} gün"), ("Çalışılan", $"{StatsMath.ActiveDays(per)} gün") };
+		for (int i = 0; i < 3; i++)
+			sGrid.Add(Card(new VerticalStackLayout { Spacing = 4, Children = { Lbl(sItems[i].Item1, 12, false, Muted), Lbl(sItems[i].Item2, 16, true) } }, 12), i, 0);
+		statsBox.Children.Add(sGrid);
+
 		// ders bazında dağılım
 		statsBox.Children.Add(Head("DERS BAZINDA DAĞILIM"));
 		var seg = new HorizontalStackLayout { Spacing = 4 };
@@ -453,6 +464,84 @@ public class MainPage : ContentPage
 			chart.Add(col, i, 0);
 		}
 		statsBox.Children.Add(Card(chart, 12));
+
+		// ısı haritası: sütun = hafta, satır = Pzt..Paz
+		statsBox.Children.Add(Head("SON 18 HAFTA · ISI HARİTASI"));
+		const int weeks = 18;
+		double goalSec = Math.Max(0.1, data.DailyGoalHours) * 3600;
+		var heat = new Grid { RowSpacing = 3, ColumnSpacing = 3 };
+		for (int r = 0; r < 7; r++) heat.RowDefinitions.Add(new RowDefinition(new GridLength(15)));
+		for (int c = 0; c < weeks; c++) heat.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+		var hStart = StatsMath.Monday(today).AddDays(-7 * (weeks - 1));
+		for (int r = 0; r < 7; r++)
+			for (int c = 0; c < weeks; c++)
+			{
+				var d = hStart.AddDays(c * 7 + r);
+				if (d > today) continue;
+				int lv = StatsMath.Level(per.GetValueOrDefault(d), goalSec);
+				heat.Add(new Border
+				{
+					BackgroundColor = HeatColor(lv), StrokeThickness = d == today ? 1.5 : 0, Stroke = Text,
+					StrokeShape = new RoundRectangle { CornerRadius = 3 }
+				}, c, r);
+			}
+		var legend = new HorizontalStackLayout { Spacing = 4, HorizontalOptions = LayoutOptions.End, Margin = new Thickness(0, 10, 0, 0) };
+		legend.Children.Add(Lbl("az", 11, false, Muted));
+		for (int l = 0; l <= 4; l++) legend.Children.Add(new Border { WidthRequest = 13, HeightRequest = 13, BackgroundColor = HeatColor(l), StrokeThickness = 0, StrokeShape = new RoundRectangle { CornerRadius = 3 } });
+		legend.Children.Add(Lbl("çok", 11, false, Muted));
+		statsBox.Children.Add(Card(new VerticalStackLayout { Children = { heat, legend } }, 14));
+
+		// haftalık toplam
+		statsBox.Children.Add(Head("HAFTALIK TOPLAM · SON 8 HAFTA"));
+		var wk = StatsMath.Weekly(per, 8);
+		var thisMon = StatsMath.Monday(today);
+		var wItems = new List<(string, int, bool)>();
+		for (int i = 0; i < 8; i++)
+		{
+			var mon = thisMon.AddDays(-7 * (7 - i));
+			wItems.Add(($"{mon.Day}\n{Tr.DateTimeFormat.AbbreviatedMonthNames[mon.Month - 1]}", wk[i], i == 7));
+		}
+		statsBox.Children.Add(Card(BarChart(wItems, true), 12));
+
+		// günün saatleri
+		statsBox.Children.Add(Head("GÜNÜN SAATLERİ"));
+		var sessions = data.Sessions.Select(s => (s.Start, s.Seconds)).ToList();
+		if (Active) sessions.Add((runStart, (int)Elapsed));
+		var hours = StatsMath.Hourly(sessions);
+		var hItems = new List<(string, int, bool)>();
+		for (int i = 0; i < 24; i++) hItems.Add((i % 3 == 0 ? i.ToString("00") : "", (int)hours[i], i == DateTime.Now.Hour));
+		statsBox.Children.Add(Card(BarChart(hItems, false), 12));
+	}
+
+	Color HeatColor(int level) => level == 0
+		? Color.FromRgba(255, 255, 255, 22)
+		: Alpha(accent, level switch { 1 => 0.33, 2 => 0.53, 3 => 0.73, _ => 1.0 });
+
+	// Ortak çubuk grafik: en yüksek değer ~120 dp'ye ölçeklenir.
+	View BarChart(List<(string label, int sec, bool hi)> items, bool showValues)
+	{
+		double max = Math.Max(items.Max(x => x.sec), 1800);
+		var chart = new Grid { HeightRequest = 180, ColumnSpacing = showValues ? 6 : 2 };
+		for (int i = 0; i < items.Count; i++)
+		{
+			chart.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+			var (label, sec, hi) = items[i];
+			var col = new VerticalStackLayout { VerticalOptions = LayoutOptions.End, Spacing = 3, HorizontalOptions = LayoutOptions.Fill };
+			if (showValues && sec > 0)
+				col.Children.Add(new Label { Text = Short(sec), FontSize = 9, TextColor = Muted, HorizontalTextAlignment = TextAlignment.Center, LineBreakMode = LineBreakMode.NoWrap });
+			col.Children.Add(new Border
+			{
+				HeightRequest = sec > 0 ? Math.Max(sec / max * 120, 3) : 2, BackgroundColor = hi ? accent : accentDim, StrokeThickness = 0,
+				StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(4, 4, 0, 0) }
+			});
+			col.Children.Add(new Label
+			{
+				Text = label, FontSize = 9, HorizontalTextAlignment = TextAlignment.Center, TextColor = hi ? Text : Muted,
+				HeightRequest = showValues ? 26 : 14, LineBreakMode = LineBreakMode.NoWrap
+			});
+			chart.Add(col, i, 0);
+		}
+		return chart;
 	}
 
 	// ---------- geçmiş ----------
@@ -618,7 +707,7 @@ public class MainPage : ContentPage
 			});
 			var row = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) }, Padding = new Thickness(4, 0) };
 			row.Add(Dot(Parse(c.Color, accent), 10), 0, 0);
-			row.Add(Lbl(c.Name, 15, true), 1, 0); row.Add(del, 2, 0);
+			row.Add(Lbl(c.Name, 15, true), 1, 0); if (c.Id != Course.GeneralId) row.Add(del, 2, 0);
 			courseBox.Children.Add(row);
 		}
 	}
@@ -649,7 +738,7 @@ public class MainPage : ContentPage
 		var from = PeriodFrom(key);
 		if (!await DisplayAlert(title, "Bu dönemdeki tüm çalışma kayıtları silinecek. Geri alınamaz.", "Sıfırla", "Vazgeç")) return;
 		data.DeleteSessions(s => s.Start >= from);
-		if (Active && runStart >= from) { runCourseId = null; runningSince = null; accumulated = 0; PersistTimer(); }
+		if (Active && runStart >= from) { runCourseId = null; runningSince = null; accumulated = 0; PersistTimer(); SyncNotification(); }
 		Changed();
 	}
 
@@ -715,10 +804,11 @@ public class MainPage : ContentPage
 			var c = CurrentCourse; if (c == null) return;
 			runCourseId = c.Id; runStart = DateTime.Now; accumulated = 0; runningSince = DateTime.UtcNow; pickedCourseId = c.Id;
 			Preferences.Set("lastCourse", c.Id);
+			_ = AskNotifyPermission();
 		}
 		else if (Running) { accumulated = Elapsed; runningSince = null; }
 		else runningSince = DateTime.UtcNow;
-		PersistTimer(); RefreshChips(); RefreshTimer();
+		PersistTimer(); SyncNotification(); RefreshChips(); RefreshTimer();
 	}
 
 	void Commit()
@@ -729,13 +819,76 @@ public class MainPage : ContentPage
 		if (s >= 5) data.Sessions.Add(new Session { CourseId = runCourseId!, Start = runStart, Seconds = s });
 		runCourseId = null; runningSince = null; accumulated = 0;
 		PersistTimer();
+		SyncNotification();
 		Changed();
 	}
 
 	void PersistTimer()
 	{
 		if (!Active) { Preferences.Remove("run"); return; }
-		Preferences.Set("run", $"{runCourseId}|{runStart.Ticks}|{accumulated.ToString(CultureInfo.InvariantCulture)}|{runningSince?.Ticks ?? 0}");
+		Preferences.Set("run", RunString(runCourseId!, runStart, accumulated, runningSince));
+	}
+
+	static string RunString(string courseId, DateTime start, double acc, DateTime? since) =>
+		$"{courseId}|{start.Ticks}|{acc.ToString(CultureInfo.InvariantCulture)}|{since?.Ticks ?? 0}";
+
+	// ---------- bildirim (çalışırken) ----------
+	public static MainPage? Current;
+
+	void SyncNotification()
+	{
+#if ANDROID
+		if (!Active) TimerNotifier.Cancel();
+		else TimerNotifier.Show(CurrentCourse?.Name ?? "", Running, Elapsed);
+#endif
+	}
+
+	static async Task AskNotifyPermission()
+	{
+#if ANDROID
+		try
+		{
+			if (await Permissions.CheckStatusAsync<Permissions.PostNotifications>() != PermissionStatus.Granted)
+				await Permissions.RequestAsync<Permissions.PostNotifications>();
+		}
+		catch { }
+#else
+		await Task.CompletedTask;
+#endif
+	}
+
+	/// <summary>Bildirimdeki düğmeler (uygulama açıkken).</summary>
+	public void ExternalAction(bool finish) =>
+		MainThread.BeginInvokeOnMainThread(() => { if (finish) Commit(); else ToggleTimer(); });
+
+	/// <summary>Bildirimdeki düğmeler (uygulama süreci kapalıyken): kayıtlı zamanlayıcıyı doğrudan günceller.</summary>
+	public static void Headless(bool finish)
+	{
+		try
+		{
+			Store.Dir = FileSystem.AppDataDirectory;
+			var p = Preferences.Get("run", "").Split('|');
+			if (p.Length != 4) { TimerNotifier.Cancel(); return; }
+			var data = Store.Load();
+			var course = data.Courses.FirstOrDefault(c => c.Id == p[0]);
+			if (course == null) { Preferences.Remove("run"); TimerNotifier.Cancel(); return; }
+			var start = new DateTime(long.Parse(p[1]));
+			var acc = double.Parse(p[2], CultureInfo.InvariantCulture);
+			var t = long.Parse(p[3]);
+			DateTime? since = t == 0 ? null : new DateTime(t, DateTimeKind.Utc);
+			double el = acc + (since is { } r ? (DateTime.UtcNow - r).TotalSeconds : 0);
+			if (finish)
+			{
+				if (el >= 5) { data.Sessions.Add(new Session { CourseId = course.Id, Start = start, Seconds = (int)el }); Store.Save(data); }
+				Preferences.Remove("run");
+				TimerNotifier.Cancel();
+				return;
+			}
+			if (since != null) { acc = el; since = null; } else since = DateTime.UtcNow;
+			Preferences.Set("run", RunString(course.Id, start, acc, since));
+			TimerNotifier.Show(course.Name, since != null, el);
+		}
+		catch { }
 	}
 
 	void RestoreTimer()
@@ -776,16 +929,34 @@ public class MainPage : ContentPage
 			canvas.DrawCircle(cx, cy, rad);
 			if (Frac < 0.002) return;
 			float sweep = (float)(Math.Min(Frac, 0.9999) * 360);
-			float end = 90 - sweep; if (end < 0) end += 360;
+			int n = (int)Math.Ceiling(sweep);
+			PointF P(double deg) { double a = deg * Math.PI / 180; return new PointF(cx + rad * (float)Math.Sin(a), cy - rad * (float)Math.Cos(a)); }
+			Color At(double t) { var (cr, cg, cb) = RingGradient.At((byte)(Accent.Red * 255), (byte)(Accent.Green * 255), (byte)(Accent.Blue * 255), t); return Color.FromRgb(cr, cg, cb); }
+
+			// Geçişli yay: 1°'lik düz çizgiler; renk, tur boyunca tonu kaydırır.
+			canvas.StrokeLineCap = LineCap.Butt;
 			if (Glow)
+				foreach (var (alpha, size) in new[] { (0.18f, 34f), (0.28f, 26f) })
+				{
+					canvas.StrokeSize = size;
+					for (int i = 0; i < n; i++)
+					{
+						double to = Math.Min(i + 1, sweep);
+						canvas.StrokeColor = At((i + 0.5) / 360.0).WithAlpha(alpha);
+						canvas.DrawLine(P(i), P(to));
+					}
+				}
+			canvas.StrokeSize = 18;
+			for (int i = 0; i < n; i++)
 			{
-				canvas.StrokeColor = Accent.WithAlpha(0.18f); canvas.StrokeSize = 34;
-				canvas.DrawArc(box.X, box.Y, box.Width, box.Height, 90, end, true, false);
-				canvas.StrokeColor = Accent.WithAlpha(0.28f); canvas.StrokeSize = 26;
-				canvas.DrawArc(box.X, box.Y, box.Width, box.Height, 90, end, true, false);
+				double to = Math.Min(i + 1.4, sweep);
+				canvas.StrokeColor = At((i + 0.7) / 360.0);
+				canvas.DrawLine(P(i), P(to));
 			}
-			canvas.StrokeColor = Accent; canvas.StrokeSize = 18;
-			canvas.DrawArc(box.X, box.Y, box.Width, box.Height, 90, end, true, false);
+			// Yuvarlak uçlar
+			var p0 = P(0); var p1 = P(sweep);
+			canvas.FillColor = At(0); canvas.FillCircle(p0, 9);
+			canvas.FillColor = At(sweep / 360.0); canvas.FillCircle(p1, 9);
 		}
 	}
 

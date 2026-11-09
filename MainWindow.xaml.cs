@@ -29,7 +29,7 @@ public partial class MainWindow : Window
     string period = "today";
 
     bool ready;
-    TextBlock[] statCards = null!;
+    TextBlock[] statCards = null!, streakCards = null!;
 
     static DateTime Today => DateTime.Today;
 
@@ -48,6 +48,7 @@ public partial class MainWindow : Window
 
         string[] titles = { "Bugün", "Bu hafta", "Bu ay", "Toplam" };
         statCards = BuildCards(StatsCards, titles);
+        streakCards = BuildCards(StreakCards, new[] { "Güncel seri", "En uzun seri", "Çalışılan gün" });
         GoalBox.Text = data.DailyGoalHours.ToString("0.##", Tr);
 
         BuildStars();
@@ -259,6 +260,9 @@ public partial class MainWindow : Window
         UpdateAll();
     }
 
+    static string Clock(int s) => $"{s / 3600:00}:{s % 3600 / 60:00}:{s % 60:00}";
+
+
     void FinishBtn_Click(object sender, RoutedEventArgs e)
     {
         Commit();
@@ -270,7 +274,7 @@ public partial class MainWindow : Window
         if (!active) return;
         sw.Stop();
         int s = (int)sw.Elapsed.TotalSeconds;
-        if (s >= 5)
+        var courseName = data.Courses.FirstOrDefault(c => c.Id == activeCourseId)?.Name ?? "";
             data.Sessions.Add(new Session { CourseId = activeCourseId, Start = activeStart, Seconds = s });
         active = false;
         sw.Reset();
@@ -284,19 +288,82 @@ public partial class MainWindow : Window
     {
         double t = active ? sw.Elapsed.TotalSeconds : 0;
         double frac = t % 3600 / 3600;
-        if (frac < 0.002) { RingArc.Visibility = Visibility.Collapsed; return; }
+        if (frac < 0.002) { RingArc.Visibility = Visibility.Collapsed; ringShown = 0; return; }
         frac = Math.Min(frac, 0.9999);
-        double ang = frac * 2 * Math.PI;
-        RingSeg.Point = new Point(150 + 140 * Math.Sin(ang), 150 - 140 * Math.Cos(ang));
-        RingSeg.IsLargeArc = frac > 0.5;
+        EnsureRingSegments();
+
+        // 1°'lik küçük çizgilerden oluşan geçişli yay: görünen parça sayısı ilerlemeye göre değişir.
+        double deg = frac * 360;
+        int m = (int)Math.Ceiling(deg);
+        for (int i = Math.Max(0, Math.Min(ringShown, m) - 2); i < Math.Max(ringShown, m); i++)
+        {
+            bool vis = i < m;
+            ringSegs[i].Visibility = vis ? Visibility.Visible : Visibility.Collapsed;
+            if (vis) SetSeg(ringSegs[i], i, i == m - 1 ? deg : i + 1.6);
+        }
+        ringShown = m;
+
+        // Yuvarlak uçlar: başlangıç ve güncel uç kendi geçiş renklerini alır.
+        var acc = WidgetColor();
+        ringCapStart!.Fill = new SolidColorBrush(GradAt(acc, 0));
+        ringCapEnd!.Fill = new SolidColorBrush(GradAt(acc, frac));
+        var (ex, ey) = RingPoint(deg);
+        Canvas.SetLeft(ringCapEnd, ex - 10); Canvas.SetTop(ringCapEnd, ey - 10);
         RingArc.Visibility = Visibility.Visible;
+    }
+
+    readonly System.Windows.Shapes.Line[] ringSegs = new System.Windows.Shapes.Line[360];
+    System.Windows.Shapes.Ellipse? ringCapStart, ringCapEnd;
+    Color ringBuiltFor;
+    int ringShown;
+
+    static (double x, double y) RingPoint(double deg)
+    {
+        double a = deg * Math.PI / 180;
+        return (150 + 140 * Math.Sin(a), 150 - 140 * Math.Cos(a));
+    }
+
+    static void SetSeg(System.Windows.Shapes.Line l, double fromDeg, double toDeg)
+    {
+        (l.X1, l.Y1) = RingPoint(fromDeg);
+        (l.X2, l.Y2) = RingPoint(toDeg);
+    }
+
+    static Color GradAt(Color acc, double t)
+    {
+        var (r, g, b) = RingGradient.At(acc.R, acc.G, acc.B, t);
+        return Color.FromRgb(r, g, b);
+    }
+
+    // Tema rengi değişince çizgilerin renkleri yeniden verilir.
+    void EnsureRingSegments()
+    {
+        var acc = WidgetColor();
+        if (ringCapStart != null && ringBuiltFor == acc) return;
+        ringBuiltFor = acc;
+        if (ringCapStart == null)
+        {
+            for (int i = 0; i < 360; i++)
+            {
+                ringSegs[i] = new System.Windows.Shapes.Line { StrokeThickness = 20, StrokeStartLineCap = PenLineCap.Flat, StrokeEndLineCap = PenLineCap.Flat, Visibility = Visibility.Collapsed };
+                RingArc.Children.Add(ringSegs[i]);
+            }
+            ringCapStart = new System.Windows.Shapes.Ellipse { Width = 20, Height = 20 };
+            ringCapEnd = new System.Windows.Shapes.Ellipse { Width = 20, Height = 20 };
+            var (sx, sy) = RingPoint(0);
+            Canvas.SetLeft(ringCapStart, sx - 10); Canvas.SetTop(ringCapStart, sy - 10);
+            RingArc.Children.Add(ringCapStart);
+            RingArc.Children.Add(ringCapEnd);
+        }
+        for (int i = 0; i < 360; i++)
+            ringSegs[i].Stroke = new SolidColorBrush(GradAt(acc, (i + 0.8) / 360.0));
     }
 
     void UpdatePips()
     {
         int laps = ActiveSeconds / 3600;
         HourPips.Children.Clear();
-        var color = RingArc.Stroke;
+        Brush color = new SolidColorBrush(WidgetColor());
         int shown = Math.Min(laps, 12);
         for (int i = 0; i < shown; i++)
             HourPips.Children.Add(new System.Windows.Shapes.Ellipse
@@ -449,7 +516,7 @@ public partial class MainWindow : Window
         FinishBtn.IsEnabled = active;
         CourseList.IsEnabled = !active;
         // Oturum sürerken ders ekle/sil butonları solmaz; sadece tıklanamaz olur.
-        DeleteCourseBtn.IsEnabled = course != null;
+        DeleteCourseBtn.IsEnabled = course != null && course.Id != Course.GeneralId;
         CourseTools.IsHitTestVisible = !active;
         if (active) AddPanel.Visibility = Visibility.Collapsed;
 
@@ -460,11 +527,14 @@ public partial class MainWindow : Window
         // Çember ve başlat butonu ayarlardaki tema rengini alır.
         var tc = WidgetColor();
         Brush ring = new SolidColorBrush(tc);
-        RingArc.Stroke = ring;
         StartBtn.Background = ring;
         // Widget'ta parıltı yok: sakin, sabit görünüm.
         RingArc.Effect = widgetMode ? null : new System.Windows.Media.Effects.DropShadowEffect
         { Color = tc, BlurRadius = 24, ShadowDepth = 0, Opacity = 0.65 };
+
+        int es = ActiveSeconds;
+        ElapsedText.Text = Clock(es);
+        ElapsedText.Opacity = !active ? 0.35 : sw.IsRunning ? 1 : 0.6;
 
         UpdateRing();
         UpdatePips();
@@ -479,7 +549,11 @@ public partial class MainWindow : Window
         GoalCol1.Width = new GridLength(pct, GridUnitType.Star);
         GoalCol2.Width = new GridLength(100 - pct, GridUnitType.Star);
         GoalText.Text = $"Bugün {Fmt(today)} / {data.DailyGoalHours.ToString("0.##", Tr)} sa" + (pct >= 100 ? "  ✓ hedef tamam" : "");
-        StreakText.Text = $"🔥 {Streak(per)} günlük seri";
+        int streak = Streak(per);
+        StreakText.Text = $"🔥 {streak} günlük seri";
+        streakCards[0].Text = $"🔥 {streak} gün";
+        streakCards[1].Text = $"{Math.Max(streak, StatsMath.LongestStreak(per))} gün";
+        streakCards[2].Text = $"{StatsMath.ActiveDays(per)} gün";
 
         statCards[0].Text = Fmt(SecondsSince(Today, null));
         statCards[1].Text = Fmt(SecondsSince(WeekStart(), null));
@@ -487,6 +561,106 @@ public partial class MainWindow : Window
         statCards[3].Text = Fmt(SecondsSince(DateTime.MinValue, null));
         UpdateBreakdown();
         UpdateChart();
+        UpdateHeatmap(per);
+        UpdateWeekly(per);
+        UpdateHourly();
+    }
+
+    // Isı haritası: sütun = hafta (Pzt..Paz satırları), son 18 hafta.
+    void UpdateHeatmap(Dictionary<DateTime, int> per)
+    {
+        const int weeks = 18;
+        HeatGrid.Children.Clear();
+        var acc = WidgetColor();
+        double goalSec = Math.Max(0.1, data.DailyGoalHours) * 3600;
+        var start = StatsMath.Monday(Today).AddDays(-7 * (weeks - 1));
+        for (int row = 0; row < 7; row++)
+            for (int col = 0; col < weeks; col++)
+            {
+                var d = start.AddDays(col * 7 + row);
+                int sec = per.GetValueOrDefault(d);
+                HeatGrid.Children.Add(new Border
+                {
+                    Height = 18, Margin = new Thickness(2), CornerRadius = new CornerRadius(4),
+                    Background = d > Today ? Brushes.Transparent : HeatBrush(acc, StatsMath.Level(sec, goalSec)),
+                    BorderBrush = d == Today ? Res("Text") : null,
+                    BorderThickness = new Thickness(d == Today ? 1.5 : 0),
+                    ToolTip = d > Today ? null : $"{d.ToString("d MMMM dddd", Tr)}: {Fmt(sec)}"
+                });
+            }
+
+        HeatLegend.Children.Clear();
+        HeatLegend.Children.Add(new TextBlock { Text = "az", Foreground = Res("Muted"), FontSize = 12, Margin = new Thickness(0, 0, 6, 0) });
+        for (int l = 0; l <= 4; l++)
+            HeatLegend.Children.Add(new Border
+            {
+                Width = 14, Height = 14, Margin = new Thickness(2, 0, 2, 0), CornerRadius = new CornerRadius(4), Background = HeatBrush(acc, l)
+            });
+        HeatLegend.Children.Add(new TextBlock { Text = "çok", Foreground = Res("Muted"), FontSize = 12, Margin = new Thickness(6, 0, 0, 0) });
+    }
+
+    static Brush HeatBrush(Color acc, int level) => level == 0
+        ? new SolidColorBrush(Color.FromArgb(0x16, 255, 255, 255))
+        : new SolidColorBrush(Color.FromArgb((byte)(level switch { 1 => 0x55, 2 => 0x88, 3 => 0xBB, _ => 0xFF }), acc.R, acc.G, acc.B));
+
+    void UpdateWeekly(Dictionary<DateTime, int> per)
+    {
+        var w = StatsMath.Weekly(per, 8);
+        var items = new List<(string label, int sec, string tip, bool hi)>();
+        var thisMon = StatsMath.Monday(Today);
+        for (int i = 0; i < 8; i++)
+        {
+            var mon = thisMon.AddDays(-7 * (7 - i));
+            items.Add(($"{mon.Day} {Tr.DateTimeFormat.AbbreviatedMonthNames[mon.Month - 1]}", w[i],
+                $"{mon.ToString("d MMM", Tr)} haftası: {Fmt(w[i])}", i == 7));
+        }
+        BuildBars(WeekGrid, items, 1, true);
+    }
+
+    void UpdateHourly()
+    {
+        var sessions = data.Sessions.Select(s => (s.Start, s.Seconds)).ToList();
+        if (active) sessions.Add((activeStart, ActiveSeconds));
+        var h = StatsMath.Hourly(sessions);
+        var items = new List<(string label, int sec, string tip, bool hi)>();
+        for (int i = 0; i < 24; i++)
+            items.Add((i % 3 == 0 ? i.ToString("00") : "", (int)h[i], $"{i:00}:00–{i:00}:59 arası toplam: {Fmt(h[i])}", i == DateTime.Now.Hour));
+        BuildBars(HourGrid, items, 1, false);
+    }
+
+    // Ortak çubuk grafik: en yüksek değer 130 px'e ölçeklenir.
+    void BuildBars(System.Windows.Controls.Primitives.UniformGrid host, List<(string label, int sec, string tip, bool hi)> items, int minMax, bool showValues)
+    {
+        host.Children.Clear();
+        double max = Math.Max(items.Max(x => x.sec), 1800 * minMax);
+        foreach (var (label, sec, tip, hi) in items)
+        {
+            var cell = new Grid { Margin = new Thickness(showValues ? 4 : 1.5, 0, showValues ? 4 : 1.5, 0), Background = Brushes.Transparent, ToolTip = tip };
+            cell.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            cell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom };
+            if (showValues && sec > 0)
+                stack.Children.Add(new TextBlock
+                {
+                    Text = ShortTime(sec), FontSize = 11, Foreground = Res("Muted"),
+                    HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 3)
+                });
+            stack.Children.Add(new Border
+            {
+                Height = sec > 0 ? Math.Max(sec / max * 130, 3) : 2,
+                Background = hi ? Res("Accent") : Res("AccentDim"),
+                CornerRadius = new CornerRadius(4, 4, 0, 0)
+            });
+            cell.Children.Add(stack);
+            var lb = new TextBlock
+            {
+                Text = label, FontSize = 11, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 6, 0, 0), Height = 18,
+                Foreground = hi ? Res("Text") : Res("Muted"), TextWrapping = TextWrapping.NoWrap
+            };
+            Grid.SetRow(lb, 1);
+            cell.Children.Add(lb);
+            host.Children.Add(cell);
+        }
     }
 
     void UpdateBreakdown()
@@ -699,6 +873,8 @@ public partial class MainWindow : Window
             StartBtn.Width = StartBtn.Height = FinishBtn.Width = FinishBtn.Height = 60;
             TimerCourseName.FontSize = 30;
             TimerStatus.FontSize = 20;
+            ElapsedText.FontSize = 24;
+            ElapsedText.Margin = new Thickness(0, 2, 0, 0);
             TimerPanel.LayoutTransform = new ScaleTransform(WidgetScale, WidgetScale);
 
             MinWidth = 0; MinHeight = 0;
@@ -742,6 +918,8 @@ public partial class MainWindow : Window
             StartBtn.Width = StartBtn.Height = FinishBtn.Width = FinishBtn.Height = 84;
             TimerCourseName.FontSize = 24;
             TimerStatus.FontSize = 14;
+            ElapsedText.FontSize = 38;
+            ElapsedText.Margin = new Thickness(0, 14, 0, 0);
             TimerPanel.LayoutTransform = Transform.Identity;
 
             Left = normalBounds.X; Top = normalBounds.Y;

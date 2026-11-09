@@ -61,6 +61,7 @@
 	<ItemGroup>
 		<Compile Include="..\Models.cs" Link="Models.cs" />
 		<Compile Include="..\SyncService.cs" Link="SyncService.cs" />
+		<Compile Include="..\StatsMath.cs" Link="StatsMath.cs" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.9" />
 	</ItemGroup>
