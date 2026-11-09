@@ -1,46 +1,107 @@
 using System.Globalization;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace FlowState.Mobile;
 
+/// <summary>Masaüstü Flow State tasarımının mobil karşılığı: koyu gradyan zemin, parlayan halka, hap sekmeler, kartlar.</summary>
 public class MainPage : ContentPage
 {
-	static readonly Color Bg = Color.FromArgb("#060814"), Panel = Color.FromArgb("#0D1126"),
-		TextC = Color.FromArgb("#EEF1FF"), Muted = Color.FromArgb("#8791B5"), Accent = Color.FromArgb("#7C9CFF"),
-		Danger = Color.FromArgb("#FF6B81");
-	static readonly string[] Palette = { "#7C9CFF", "#FF9F5A", "#FF6FA8", "#4FD6A5", "#B58CFF", "#FFD25A", "#5AD1FF" };
+	// ---------- tema ----------
+	static readonly Color Text = Color.FromArgb("#EEF1FF"), Muted = Color.FromArgb("#8791B5"),
+		Panel = Color.FromRgba(13, 17, 38, 166), Panel2 = Color.FromRgba(28, 36, 71, 179), Danger = Color.FromArgb("#E58A8A");
+	static readonly string[] Palette = { "#4F8CFF", "#F2994A", "#27AE60", "#BB6BD9", "#EB5757", "#2D9CDB", "#F2C94C", "#56CCF2" };
+	static readonly string[] Swatches = { "#5B8CFF", "#FF5A6A", "#3DDC97", "#A78BFA", "#FFB04D", "#FF6FB5", "#2DD4D4", "#E5E7EB" };
 	static readonly CultureInfo Tr = new("tr-TR");
 
+	Color accent = Color.FromArgb("#5B8CFF"), accentDim = Colors.Gray, sel = Colors.Gray;
+
+	static Color Tint(Color c, double k, int add) => Color.FromRgb(
+		(int)Math.Min(255, c.Red * 255 * k + add), (int)Math.Min(255, c.Green * 255 * k + add), (int)Math.Min(255, c.Blue * 255 * k + add));
+	static Color Lighten(Color c, double t) => Color.FromRgb(
+		(int)(c.Red * 255 + (255 - c.Red * 255) * t), (int)(c.Green * 255 + (255 - c.Green * 255) * t), (int)(c.Blue * 255 + (255 - c.Blue * 255) * t));
+	static Color Alpha(Color c, double a) => c.WithAlpha((float)a);
+
+	// ---------- veri / zamanlayıcı ----------
 	readonly AppData data;
 	readonly SyncService sync;
-
-	// zamanlayıcı durumu (zaman damgalarından hesaplanır; arka plan sayacı bozmaz)
 	string? runCourseId; DateTime runStart; double accumulated; DateTime? runningSince;
 	bool Active => runCourseId != null;
+	bool Running => runningSince != null;
 	double Elapsed => accumulated + (runningSince is { } r ? (DateTime.UtcNow - r).TotalSeconds : 0);
+	string? pickedCourseId;
+	string period = "today";
+	int persistCounter;
 
+	// ---------- görünüm öğeleri ----------
+	readonly Grid root = new();
 	readonly Grid body = new();
-	readonly VerticalStackLayout[] views = new VerticalStackLayout[4];
-	readonly Button[] tabs = new Button[4];
+	readonly View[] views = new View[4];
+	readonly Border[] navItems = new Border[4];
+	readonly Label[] navLabels = new Label[4];
 	int tab;
 	readonly IDispatcherTimer ticker;
 
-	readonly Label timeLabel = L("00:00:00", 54, true), courseInfo = L("", 14), syncLabel = L("", 12);
-	readonly Picker picker = new() { TextColor = TextC, TitleColor = Muted, BackgroundColor = Panel, Title = "Ders seç" };
-	Button startBtn = null!, finishBtn = null!;
+	readonly RingDrawable ring = new();
+	readonly GraphicsView ringView = new() { WidthRequest = 270, HeightRequest = 270, HorizontalOptions = LayoutOptions.Center };
+	readonly Label ringCourse = Lbl("Bir ders ekle", 22, true), ringStatus = Lbl("", 13, false, Muted), timeLabel = Lbl("00:00:00", 44, true),
+		pipsLabel = Lbl("", 14, false, Color.FromArgb("#C9D0EE")), syncDot = Lbl("", 12, false, Muted);
+	readonly HorizontalStackLayout chips = new() { Spacing = 8 };
+	readonly HorizontalStackLayout pips = new() { Spacing = 8, HorizontalOptions = LayoutOptions.Center, HeightRequest = 14 };
+	readonly IconDrawable startIcon = new(0), stopIcon = new(2);
+	readonly GraphicsView startGv = new() { WidthRequest = 34, HeightRequest = 34, InputTransparent = true },
+		stopGv = new() { WidthRequest = 34, HeightRequest = 34, InputTransparent = true };
+	Border startBtn = null!, stopBtn = null!;
+	readonly Border blob1 = new(), blob2 = new(), blob3 = new(), blob4 = new();
 	readonly VerticalStackLayout statsBox = new() { Spacing = 10 }, historyBox = new() { Spacing = 8 },
 		courseBox = new() { Spacing = 8 }, accountBox = new() { Spacing = 10 };
-	int persistCounter;
-	bool refreshing;
+	readonly FlexLayout swatchRow = new() { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
+	Entry hexEntry = null!, goalEntry = null!;
 
-	static Label L(string t, double size, bool bold = false, Color? c = null) => new()
-	{ Text = t, FontSize = size, TextColor = c ?? TextC, FontAttributes = bold ? FontAttributes.Bold : FontAttributes.None };
+	// ---------- yardımcılar ----------
+	static Label Lbl(string t, double size, bool bold = false, Color? c = null) => new()
+	{ Text = t, FontSize = size, TextColor = c ?? Text, FontAttributes = bold ? FontAttributes.Bold : FontAttributes.None };
 
-	static Button B(string t, Color? bg = null, Color? fg = null) => new()
-	{ Text = t, BackgroundColor = bg ?? Accent, TextColor = fg ?? Bg, CornerRadius = 14, HeightRequest = 48, FontAttributes = FontAttributes.Bold };
+	static Label Head(string t) => new()
+	{ Text = t, FontSize = 12, TextColor = Muted, FontAttributes = FontAttributes.Bold, CharacterSpacing = 1.5, Margin = new Thickness(2, 18, 0, 6) };
 
-	static Entry E(string ph, bool pw = false, Keyboard? kb = null) => new()
-	{ Placeholder = ph, IsPassword = pw, Keyboard = kb ?? Keyboard.Default, TextColor = TextC, PlaceholderColor = Muted, BackgroundColor = Panel };
+	static Border Card(View content, double pad = 16) => new()
+	{
+		BackgroundColor = Panel, StrokeThickness = 0, Padding = pad,
+		StrokeShape = new RoundRectangle { CornerRadius = 18 }, Content = content
+	};
 
+	Border Pill(string text, bool filled, Color? fg = null)
+	{
+		var l = Lbl(text, 14, true, fg ?? (filled ? Color.FromArgb("#0A0E1A") : Text));
+		l.HorizontalTextAlignment = TextAlignment.Center; l.VerticalTextAlignment = TextAlignment.Center;
+		return new Border
+		{
+			BackgroundColor = filled ? accent : Panel2, StrokeThickness = 0, Padding = new Thickness(18, 0), HeightRequest = 46,
+			StrokeShape = new RoundRectangle { CornerRadius = 14 }, Content = l
+		};
+	}
+
+	static void Tap(View v, Action a)
+	{
+		var g = new TapGestureRecognizer(); g.Tapped += (_, _) => a(); v.GestureRecognizers.Add(g);
+	}
+
+	static Entry Field(string ph, bool pw = false, Keyboard? kb = null) => new()
+	{ Placeholder = ph, IsPassword = pw, Keyboard = kb ?? Keyboard.Default, TextColor = Text, PlaceholderColor = Muted, BackgroundColor = Panel2 };
+
+	static void Buzz() { try { HapticFeedback.Default.Perform(HapticFeedbackType.Click); } catch { } }
+
+	static string Fmt(double sec)
+	{
+		int s = (int)sec, h = s / 3600, m = s % 3600 / 60;
+		return h > 0 ? $"{h} sa {m:00} dk" : m > 0 ? $"{m} dk" : $"{s} sn";
+	}
+
+	static string Short(int sec) => sec >= 3600 ? $"{sec / 3600}s{sec % 3600 / 60:00}" : sec >= 60 ? $"{sec / 60}dk" : $"{sec}sn";
+
+	static Color Parse(string hex, Color fallback) { try { return Color.FromArgb(hex); } catch { return fallback; } }
+
+	// ---------- kurulum ----------
 	public MainPage()
 	{
 		Store.Dir = FileSystem.AppDataDirectory;
@@ -49,181 +110,483 @@ public class MainPage : ContentPage
 		sync = new SyncService(data, SynchronizationContext.Current ?? new SynchronizationContext(),
 			new AndroidSecretCodec(), () => MainThread.BeginInvokeOnMainThread(RefreshAll),
 			id => Active && runCourseId == id);
-		sync.StatusChanged += () => MainThread.BeginInvokeOnMainThread(() => { syncLabel.Text = sync.Status; RefreshAccount(); });
+		sync.StatusChanged += () => MainThread.BeginInvokeOnMainThread(() => { RefreshAccount(); RefreshSyncDot(); });
 
-		BackgroundColor = Bg;
+		pickedCourseId = Preferences.Get("lastCourse", "");
 
+		BuildBackground();
 		views[0] = BuildTimerView();
-		views[1] = new VerticalStackLayout { Spacing = 10, Padding = 20, Children = { L("İstatistik", 22, true), statsBox } };
-		views[2] = new VerticalStackLayout { Spacing = 10, Padding = 20, Children = { L("Geçmiş", 22, true), historyBox } };
+		views[1] = Scroll(new VerticalStackLayout { Padding = new Thickness(20, 8, 20, 24), Children = { Lbl("İstatistikler", 26, true), statsBox } });
+		views[2] = Scroll(new VerticalStackLayout { Padding = new Thickness(20, 8, 20, 24), Children = { Lbl("Geçmiş", 26, true), new BoxView { HeightRequest = 8, Color = Colors.Transparent }, historyBox } });
 		views[3] = BuildSettingsView();
-		foreach (var v in views) body.Children.Add(new ScrollView { Content = v, IsVisible = false });
+		foreach (var v in views) { v.IsVisible = false; body.Children.Add(v); }
 
-		var bar = new Grid { BackgroundColor = Panel, ColumnDefinitions = { new(), new(), new(), new() }, Padding = new Thickness(6, 4) };
-		string[] names = { "Süre", "İstatistik", "Geçmiş", "Ayarlar" };
-		for (int i = 0; i < 4; i++)
-		{
-			int idx = i;
-			tabs[i] = new Button { Text = names[i], BackgroundColor = Colors.Transparent, TextColor = Muted, FontSize = 13 };
-			tabs[i].Clicked += (_, _) => ShowTab(idx);
-			bar.Add(tabs[i], i, 0);
-		}
-		var root = new Grid { RowDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, Padding = new Thickness(0, 24, 0, 0) };
-		root.Add(body, 0, 0); root.Add(bar, 0, 1);
-		Content = root;
+		root.RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) };
+		var top = new Grid { Padding = new Thickness(24, 30, 24, 4), ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
+		top.Add(Lbl("Flow State", 16, true, Muted), 0, 0);
+		top.Add(syncDot, 1, 0);
+		root.Add(top, 0, 0); root.Add(body, 0, 1); root.Add(BuildNav(), 0, 2);
+		Content = new Grid { IsClippedToBounds = true, Children = { blob1, blob2, blob3, blob4, root } };
 
 		ticker = Dispatcher.CreateTimer();
 		ticker.Interval = TimeSpan.FromSeconds(1);
 		ticker.Tick += (_, _) => Tick();
 		ticker.Start();
 
-		ShowTab(sync.SignedIn ? 0 : 3);
+		ApplyTheme();
+		ShowTab(sync.SignedIn || data.Courses.Count > 0 ? 0 : 3);
 	}
 
-	// ---------- görünümler ----------
+	static ScrollView Scroll(View v) => new() { Content = v };
 
-	VerticalStackLayout BuildTimerView()
+	void BuildBackground()
 	{
-		startBtn = B("Başlat"); startBtn.Clicked += (_, _) => ToggleTimer();
-		finishBtn = B("Bitir", Panel, TextC); finishBtn.Clicked += (_, _) => Commit();
-		picker.SelectedIndexChanged += (_, _) => { if (!refreshing) { if (Selected is { } c) LastCourse = c.Id; RefreshTimer(); } };
-		timeLabel.HorizontalOptions = LayoutOptions.Center; courseInfo.HorizontalOptions = LayoutOptions.Center;
-		courseInfo.TextColor = Muted; syncLabel.TextColor = Muted; syncLabel.HorizontalOptions = LayoutOptions.Center;
-		return new VerticalStackLayout
+		void B(Border b, double size, LayoutOptions h, LayoutOptions v, Thickness m)
 		{
-			Spacing = 16, Padding = 20,
-			Children = { L("Flow State", 22, true), picker, new BoxView { HeightRequest = 30, Color = Colors.Transparent },
-				timeLabel, courseInfo, startBtn, finishBtn, syncLabel }
-		};
-	}
-
-	VerticalStackLayout BuildSettingsView()
-	{
-		var name = E("Yeni ders adı");
-		var add = B("Ders ekle");
-		add.Clicked += (_, _) =>
-		{
-			var n = name.Text?.Trim();
-			if (string.IsNullOrEmpty(n) || data.Courses.Any(c => c.Name.Equals(n, StringComparison.CurrentCultureIgnoreCase))) return;
-			data.Courses.Add(new Course { Name = n, Color = Palette[data.Courses.Count % Palette.Length] });
-			name.Text = ""; Changed();
-		};
-		return new VerticalStackLayout
-		{
-			Spacing = 12, Padding = 20,
-			Children = { L("Ayarlar", 22, true), L("Hesap ve senkron", 15, true, Muted), accountBox,
-				L("Dersler", 15, true, Muted), name, add, courseBox }
-		};
-	}
-
-	void ShowTab(int i)
-	{
-		tab = i;
-		for (int k = 0; k < 4; k++)
-		{
-			((View)body.Children[k]).IsVisible = k == i;
-			tabs[k].TextColor = k == i ? Accent : Muted;
+			b.WidthRequest = b.HeightRequest = size; b.HorizontalOptions = h; b.VerticalOptions = v; b.Margin = m;
+			b.StrokeThickness = 0; b.StrokeShape = new RoundRectangle { CornerRadius = (float)(size / 2) }; b.InputTransparent = true;
 		}
-		RefreshAll();
+		B(blob1, 520, LayoutOptions.Start, LayoutOptions.Start, new Thickness(-210, -230, 0, 0));
+		B(blob2, 480, LayoutOptions.End, LayoutOptions.End, new Thickness(0, 0, -200, -200));
+		B(blob3, 420, LayoutOptions.End, LayoutOptions.Start, new Thickness(0, -150, -190, 0));
+		B(blob4, 380, LayoutOptions.Start, LayoutOptions.End, new Thickness(-170, 0, 0, -150));
 	}
 
-	// ---------- yenileme ----------
-
-	string? LastCourse
+	static RadialGradientBrush Glow(Color c, double a) => new(new[]
 	{
-		get => Preferences.Get("lastCourse", "");
-		set => Preferences.Set("lastCourse", value ?? "");
-	}
+		new GradientStop(Alpha(c, a), 0f), new GradientStop(Alpha(c, 0), 1f)
+	}) { Center = new Point(0.5, 0.5), Radius = 0.5 };
 
-	void RefreshAll()
+	void ApplyTheme()
 	{
-		refreshing = true;
-		picker.ItemsSource = data.Courses.Select(c => c.Name).ToList();
-		var sel = runCourseId ?? LastCourse;
-		var idx = data.Courses.FindIndex(c => c.Id == sel);
-		picker.SelectedIndex = idx >= 0 ? idx : (data.Courses.Count > 0 ? 0 : -1);
-		refreshing = false;
-		RefreshTimer(); RefreshStats(); RefreshHistory(); RefreshCourses(); RefreshAccount();
-		syncLabel.Text = sync.Status;
+		accent = Parse(data.WidgetColor, Color.FromArgb("#5B8CFF"));
+		accentDim = Tint(accent, 0.42, 14);
+		sel = Tint(accent, 0.30, 22);
+		Background = new LinearGradientBrush(new GradientStopCollection
+		{
+			new GradientStop(Tint(accent, 0.09, 5), 0f), new GradientStop(Tint(accent, 0.20, 8), 1f)
+		}, new Point(0, 0), new Point(1, 1));
+		blob1.Background = Glow(accent, 0.44); blob2.Background = Glow(Lighten(accent, 0.35), 0.31);
+		blob3.Background = Glow(accent, 0.47); blob4.Background = Glow(Tint(accent, 0.75, 0), 0.33);
+		ring.Accent = accent; startIcon.Color = Color.FromArgb("#0A0E1A"); stopIcon.Color = Text;
+		if (startBtn != null) startBtn.BackgroundColor = accent;
+		for (int i = 0; i < 4; i++) StyleNav(i);
+		ringView.Invalidate();
 	}
 
-	Course? Selected => picker.SelectedIndex >= 0 && picker.SelectedIndex < data.Courses.Count ? data.Courses[picker.SelectedIndex] : null;
+	Border BuildNav()
+	{
+		string[] names = { "Çalış", "İstatistik", "Geçmiş", "Ayarlar" };
+		var row = new Grid { ColumnSpacing = 2, ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star) } };
+		for (int i = 0; i < 4; i++)
+		{
+			int idx = i;
+			navLabels[i] = Lbl(names[i], 13, true, Muted);
+			navLabels[i].HorizontalOptions = LayoutOptions.Center; navLabels[i].VerticalOptions = LayoutOptions.Center;
+			navItems[i] = new Border
+			{
+				BackgroundColor = Colors.Transparent, StrokeThickness = 0, HeightRequest = 42, Padding = new Thickness(4, 0),
+				StrokeShape = new RoundRectangle { CornerRadius = 21 }, Content = navLabels[i]
+			};
+			Tap(navItems[i], () => ShowTab(idx));
+			row.Add(navItems[i], i, 0);
+		}
+		return new Border
+		{
+			BackgroundColor = Color.FromRgba(11, 15, 32, 235), Stroke = Color.FromRgba(255, 255, 255, 34), StrokeThickness = 1,
+			StrokeShape = new RoundRectangle { CornerRadius = 26 }, Padding = 4, Margin = new Thickness(18, 4, 18, 18), Content = row
+		};
+	}
+
+	void StyleNav(int i)
+	{
+		if (navItems[i] == null) return;
+		navItems[i].BackgroundColor = i == tab ? sel : Colors.Transparent;
+		navLabels[i].TextColor = i == tab ? Text : Muted;
+	}
+
+	// ---------- çalış görünümü ----------
+	View BuildTimerView()
+	{
+		ringView.Drawable = ring;
+		ringCourse.HorizontalTextAlignment = TextAlignment.Center; ringCourse.MaxLines = 2; ringCourse.LineBreakMode = LineBreakMode.TailTruncation;
+		ringStatus.HorizontalTextAlignment = TextAlignment.Center;
+		var center = new VerticalStackLayout
+		{
+			Spacing = 4, VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.Center, WidthRequest = 170,
+			InputTransparent = true, Children = { ringCourse, ringStatus }
+		};
+		var ringHost = new Grid { HorizontalOptions = LayoutOptions.Center, Children = { ringView, center } };
+		Tap(ringHost, ToggleTimer);
+
+		timeLabel.HorizontalTextAlignment = TextAlignment.Center; timeLabel.FontFamily = "OpenSansSemibold";
+		pipsLabel.HorizontalTextAlignment = TextAlignment.Center;
+
+		startGv.Drawable = startIcon; stopGv.Drawable = stopIcon;
+		startBtn = new Border
+		{
+			WidthRequest = 84, HeightRequest = 84, StrokeThickness = 0, BackgroundColor = accent,
+			StrokeShape = new RoundRectangle { CornerRadius = 42 }, Content = startGv, Padding = 25
+		};
+		stopBtn = new Border
+		{
+			WidthRequest = 84, HeightRequest = 84, StrokeThickness = 0, BackgroundColor = Panel2,
+			StrokeShape = new RoundRectangle { CornerRadius = 42 }, Content = stopGv, Padding = 25
+		};
+		Tap(startBtn, ToggleTimer); Tap(stopBtn, Commit);
+		var btns = new HorizontalStackLayout { Spacing = 20, HorizontalOptions = LayoutOptions.Center, Children = { startBtn, stopBtn } };
+
+		var chipScroll = new ScrollView { Orientation = ScrollOrientation.Horizontal, HorizontalScrollBarVisibility = ScrollBarVisibility.Never, Content = chips };
+
+		return Scroll(new VerticalStackLayout
+		{
+			Spacing = 10, Padding = new Thickness(0, 10, 0, 20),
+			Children =
+			{
+				new Grid { Padding = new Thickness(16, 0), Children = { chipScroll } },
+				new BoxView { HeightRequest = 6, Color = Colors.Transparent },
+				ringHost, timeLabel, pips, pipsLabel,
+				new BoxView { HeightRequest = 6, Color = Colors.Transparent }, btns
+			}
+		});
+	}
+
+	void RefreshChips()
+	{
+		chips.Children.Clear();
+		foreach (var c in data.Courses)
+		{
+			var course = c;
+			bool isSel = CurrentCourse?.Id == c.Id;
+			var row = new HorizontalStackLayout
+			{
+				Spacing = 8,
+				Children =
+				{
+					new BoxView { WidthRequest = 10, HeightRequest = 10, CornerRadius = 5, Color = Parse(c.Color, accent), VerticalOptions = LayoutOptions.Center },
+					Lbl(c.Name, 14)
+				}
+			};
+			var chip = new Border
+			{
+				Padding = new Thickness(14, 9), StrokeShape = new RoundRectangle { CornerRadius = 20 },
+				BackgroundColor = isSel ? sel : Panel, Stroke = isSel ? accent : Colors.Transparent, StrokeThickness = 1.5,
+				Opacity = Active && !isSel ? 0.45 : 1, Content = row
+			};
+			Tap(chip, () =>
+			{
+				if (Active) return;
+				pickedCourseId = course.Id; Preferences.Set("lastCourse", course.Id); Buzz(); RefreshChips(); RefreshTimer();
+			});
+			chips.Children.Add(chip);
+		}
+		if (data.Courses.Count == 0)
+		{
+			var add = Pill("＋ İlk dersini ekle", true);
+			Tap(add, () => ShowTab(3));
+			chips.Children.Add(add);
+		}
+	}
+
+	Course? CurrentCourse
+	{
+		get
+		{
+			var id = runCourseId ?? pickedCourseId;
+			return data.Courses.FirstOrDefault(c => c.Id == id) ?? data.Courses.FirstOrDefault();
+		}
+	}
 
 	void RefreshTimer()
 	{
 		var s = (int)Elapsed;
 		timeLabel.Text = $"{s / 3600:00}:{s % 3600 / 60:00}:{s % 60:00}";
-		courseInfo.Text = !Active ? (data.Courses.Count == 0 ? "Önce Ayarlar'dan ders ekle" : "Hazır")
-			: runningSince != null ? "Çalışıyor…" : "Duraklatıldı";
-		startBtn.Text = !Active ? "Başlat" : runningSince != null ? "Duraklat" : "Devam";
-		finishBtn.IsEnabled = Active;
-		picker.IsEnabled = !Active;
+		var course = CurrentCourse;
+		ringCourse.Text = course?.Name ?? "Bir ders ekle";
+		ringStatus.Text = !Active ? (course == null ? "" : "Başlamaya hazır") : !Running ? "Duraklatıldı" : "Odaklanıyorsun";
+		startIcon.Kind = Active && Running ? 1 : 0;
+		startGv.Invalidate();
+		startBtn.Opacity = course == null ? 0.35 : 1;
+		stopBtn.Opacity = Active ? 1 : 0.3;
+		ring.Frac = Active ? s % 3600 / 3600.0 : 0;
+		ring.Glow = true;
+		ringView.Invalidate();
+
+		int laps = s / 3600;
+		pips.Children.Clear();
+		for (int i = 0; i < Math.Min(laps, 12); i++)
+			pips.Children.Add(new BoxView { WidthRequest = 12, HeightRequest = 12, CornerRadius = 6, Color = accent });
+		if (laps > 12) pips.Children.Add(Lbl($"+{laps - 12}", 13, false, Text));
+		if (Active)
+			pips.Children.Add(new Border { WidthRequest = 12, HeightRequest = 12, StrokeThickness = 1.5, Stroke = accent, BackgroundColor = Colors.Transparent, StrokeShape = new RoundRectangle { CornerRadius = 6 } });
+		pipsLabel.Text = !Active ? "" : laps == 0 ? "İlk saatin turu" : $"{laps} saat tamamlandı";
 	}
 
-	static string Fmt(double sec)
+	void RefreshSyncDot()
 	{
-		int s = (int)sec; return s >= 3600 ? $"{s / 3600} sa {s % 3600 / 60} dk" : s >= 60 ? $"{s / 60} dk" : $"{s} sn";
+		syncDot.Text = sync.SignedIn ? (sync.Status.Length > 28 ? sync.Status[..28] + "…" : sync.Status) : "Çevrimdışı";
+	}
+
+	// ---------- istatistik ----------
+	DateTime PeriodFrom(string p)
+	{
+		var today = DateTime.Today;
+		return p switch
+		{
+			"today" => today,
+			"week" => today.AddDays(-(((int)today.DayOfWeek + 6) % 7)),
+			"month" => new DateTime(today.Year, today.Month, 1),
+			_ => DateTime.MinValue
+		};
+	}
+
+	double SecondsSince(DateTime from, string? courseId = null)
+	{
+		double t = data.Sessions.Where(s => s.Start >= from && (courseId == null || s.CourseId == courseId)).Sum(s => (double)s.Seconds);
+		if (Active && runStart >= from && (courseId == null || runCourseId == courseId)) t += Elapsed;
+		return t;
+	}
+
+	Dictionary<DateTime, int> PerDay()
+	{
+		var r = new Dictionary<DateTime, int>();
+		foreach (var s in data.Sessions) r[s.Start.Date] = r.GetValueOrDefault(s.Start.Date) + s.Seconds;
+		if (Active) r[runStart.Date] = r.GetValueOrDefault(runStart.Date) + (int)Elapsed;
+		return r;
+	}
+
+	static int Streak(Dictionary<DateTime, int> per)
+	{
+		var d = DateTime.Today;
+		if (per.GetValueOrDefault(d) < 60) d = d.AddDays(-1);
+		int n = 0;
+		while (per.GetValueOrDefault(d) >= 60) { n++; d = d.AddDays(-1); }
+		return n;
 	}
 
 	void RefreshStats()
 	{
 		statsBox.Children.Clear();
+		var per = PerDay();
 		var today = DateTime.Today;
-		var weekStart = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
-		var monthStart = new DateTime(today.Year, today.Month, 1);
-		double Sum(DateTime from) => data.Sessions.Where(s => s.Start >= from).Sum(s => (double)s.Seconds)
-			+ (Active && runStart >= from ? Elapsed : 0);
-		var todaySum = Sum(today);
-		foreach (var (t, v) in new[] { ("Bugün", todaySum), ("Bu hafta", Sum(weekStart)), ("Bu ay", Sum(monthStart)), ("Toplam", Sum(DateTime.MinValue)) })
+		double todaySec = per.GetValueOrDefault(today);
+
+		statsBox.Children.Add(Head("TÜM DERSLER"));
+		var grid = new Grid { ColumnSpacing = 10, RowSpacing = 10, ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, RowDefinitions = { new(GridLength.Auto), new(GridLength.Auto) } };
+		var items = new[] { ("Bugün", SecondsSince(PeriodFrom("today"))), ("Bu hafta", SecondsSince(PeriodFrom("week"))), ("Bu ay", SecondsSince(PeriodFrom("month"))), ("Toplam", SecondsSince(DateTime.MinValue)) };
+		for (int i = 0; i < 4; i++)
+			grid.Add(Card(new VerticalStackLayout { Spacing = 6, Children = { Lbl(items[i].Item1, 13, false, Muted), Lbl(Fmt(items[i].Item2), 21, true) } }), i % 2, i / 2);
+		statsBox.Children.Add(grid);
+
+		// hedef
+		statsBox.Children.Add(Head("BUGÜNKÜ HEDEF"));
+		double goal = Math.Max(0.1, data.DailyGoalHours) * 3600, pct = Math.Min(100, todaySec / goal * 100);
+		var bar = new Grid { HeightRequest = 10, Margin = new Thickness(0, 12, 0, 0) };
+		bar.Add(new Border { BackgroundColor = Panel2, StrokeThickness = 0, StrokeShape = new RoundRectangle { CornerRadius = 5 } });
+		var fill = new Grid { ColumnDefinitions = { new(new GridLength(Math.Max(pct, 0.001), GridUnitType.Star)), new(new GridLength(Math.Max(100 - pct, 0.001), GridUnitType.Star)) } };
+		fill.Add(new Border { BackgroundColor = accent, StrokeThickness = 0, StrokeShape = new RoundRectangle { CornerRadius = 5 } }, 0, 0);
+		bar.Add(fill);
+		statsBox.Children.Add(Card(new VerticalStackLayout
 		{
-			statsBox.Children.Add(new Border
+			Children =
 			{
-				BackgroundColor = Panel, StrokeThickness = 0, Padding = 16,
-				StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 16 },
-				Content = new VerticalStackLayout { Children = { L(t, 13, false, Muted), L(Fmt(v), 24, true) } }
-			});
+				Lbl($"Bugün {Fmt(todaySec)} / {data.DailyGoalHours.ToString("0.##", Tr)} sa" + (pct >= 100 ? "  ✓ hedef tamam" : ""), 14),
+				Lbl($"🔥 {Streak(per)} günlük seri", 13, false, Muted), bar
+			}
+		}, 18));
+
+		// ders bazında dağılım
+		statsBox.Children.Add(Head("DERS BAZINDA DAĞILIM"));
+		var seg = new HorizontalStackLayout { Spacing = 4 };
+		foreach (var (key, name) in new[] { ("today", "Bugün"), ("week", "Hafta"), ("month", "Ay"), ("all", "Toplam") })
+		{
+			var k = key; bool on = period == k;
+			var l = Lbl(name, 13, true, on ? Text : Muted);
+			var p = new Border { Padding = new Thickness(14, 7), StrokeThickness = 0, BackgroundColor = on ? sel : Colors.Transparent, StrokeShape = new RoundRectangle { CornerRadius = 18 }, Content = l };
+			Tap(p, () => { period = k; RefreshStats(); });
+			seg.Children.Add(p);
 		}
-		var goal = data.DailyGoalHours * 3600;
-		if (goal > 0) statsBox.Children.Add(L($"Günlük hedef: %{Math.Min(100, (int)(todaySum / goal * 100))} ({data.DailyGoalHours:0.##} sa)", 13, false, Muted));
+		statsBox.Children.Add(seg);
+		var from = PeriodFrom(period);
+		var rows = data.Courses.Select(c => (c, sec: SecondsSince(from, c.Id))).Where(x => x.sec > 0).OrderByDescending(x => x.sec).ToList();
+		double total = rows.Sum(x => x.sec);
+		if (rows.Count == 0) statsBox.Children.Add(Lbl("Bu dönemde kayıt yok.", 14, false, Muted));
+		foreach (var (c, sec) in rows)
+		{
+			var col = Parse(c.Color, accent);
+			double share = sec / total * 100;
+			var track = new Grid { HeightRequest = 8, ColumnDefinitions = { new(new GridLength(Math.Max(share, 0.001), GridUnitType.Star)), new(new GridLength(Math.Max(100 - share, 0.001), GridUnitType.Star)) } };
+			track.Add(new Border { BackgroundColor = col, StrokeThickness = 0, StrokeShape = new RoundRectangle { CornerRadius = 4 } }, 0, 0);
+			var head = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
+			head.Add(Lbl(c.Name, 14, true), 0, 0); head.Add(Lbl($"{Fmt(sec)} · %{(int)share}", 13, false, Muted), 1, 0);
+			statsBox.Children.Add(Card(new VerticalStackLayout { Spacing = 8, Children = { head, track } }, 14));
+		}
+
+		// son 14 gün
+		statsBox.Children.Add(Head("SON 14 GÜN"));
+		var days = Enumerable.Range(0, 14).Select(i => today.AddDays(i - 13)).ToList();
+		double max = Math.Max(days.Max(d => per.GetValueOrDefault(d)), 1800);
+		var chart = new Grid { HeightRequest = 190, ColumnSpacing = 3 };
+		for (int i = 0; i < 14; i++)
+		{
+			chart.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+			var d = days[i]; int sec = per.GetValueOrDefault(d); bool isToday = d == today;
+			var col = new VerticalStackLayout { VerticalOptions = LayoutOptions.End, Spacing = 3, HorizontalOptions = LayoutOptions.Fill };
+			if (sec > 0) col.Children.Add(new Label { Text = Short(sec), FontSize = 8, TextColor = Muted, HorizontalTextAlignment = TextAlignment.Center, LineBreakMode = LineBreakMode.NoWrap });
+			col.Children.Add(new Border
+			{
+				HeightRequest = sec > 0 ? Math.Max(sec / max * 120, 3) : 2, BackgroundColor = isToday ? accent : accentDim, StrokeThickness = 0,
+				StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(4, 4, 0, 0) }
+			});
+			col.Children.Add(new Label
+			{
+				Text = $"{Tr.DateTimeFormat.AbbreviatedDayNames[(int)d.DayOfWeek][..1]}\n{d.Day}", FontSize = 9, HorizontalTextAlignment = TextAlignment.Center,
+				TextColor = isToday ? Text : Muted
+			});
+			chart.Add(col, i, 0);
+		}
+		statsBox.Children.Add(Card(chart, 12));
 	}
 
+	// ---------- geçmiş ----------
 	void RefreshHistory()
 	{
 		historyBox.Children.Clear();
-		foreach (var s in data.Sessions.OrderByDescending(x => x.Start).Take(100))
+		var list = data.Sessions.OrderByDescending(s => s.Start).Take(200).ToList();
+		if (list.Count == 0) { historyBox.Children.Add(Lbl("Henüz kayıtlı çalışma yok.", 14, false, Muted)); return; }
+		foreach (var s in list)
 		{
-			var c = data.Courses.FirstOrDefault(x => x.Id == s.CourseId);
-			var del = new Button { Text = "Sil", BackgroundColor = Colors.Transparent, TextColor = Danger, WidthRequest = 72 };
 			var sess = s;
-			del.Clicked += async (_, _) =>
+			var c = data.Courses.FirstOrDefault(x => x.Id == s.CourseId);
+			var del = Lbl("✕", 16, true, Muted); del.Padding = new Thickness(12, 8); del.VerticalOptions = LayoutOptions.Center;
+			Tap(del, async () =>
 			{
-				if (await DisplayAlert("Sil", "Bu kayıt silinsin mi?", "Sil", "Vazgeç")) { data.DeleteSession(sess); Changed(); }
-			};
-			var row = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, BackgroundColor = Panel, Padding = new Thickness(14, 6) };
-			row.Add(new VerticalStackLayout { Children = { L(c?.Name ?? "(silinmiş ders)", 15, true), L($"{s.Start.ToString("d MMM HH:mm", Tr)} · {Fmt(s.Seconds)}", 12, false, Muted) } }, 0, 0);
-			row.Add(del, 1, 0);
-			historyBox.Children.Add(row);
+				if (await DisplayAlert("Kaydı sil", "Bu çalışma kaydı silinsin mi?", "Sil", "Vazgeç")) { data.DeleteSession(sess); Changed(); }
+			});
+			var dot = new BoxView { WidthRequest = 10, HeightRequest = 10, CornerRadius = 5, Color = Parse(c?.Color ?? "#8791B5", Muted), VerticalOptions = LayoutOptions.Center };
+			var info = new VerticalStackLayout { Spacing = 2, Children = { Lbl(c?.Name ?? "(silinmiş ders)", 15, true), Lbl(s.Start.ToString("d MMM yyyy HH:mm", Tr), 12, false, Muted) } };
+			var dur = Lbl(Fmt(s.Seconds), 14, true); dur.VerticalOptions = LayoutOptions.Center;
+			var row = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto) } };
+			row.Add(dot, 0, 0); row.Add(info, 1, 0); row.Add(dur, 2, 0); row.Add(del, 3, 0);
+			var card = Card(row, 0); card.Padding = new Thickness(14, 6, 4, 6);
+			historyBox.Children.Add(card);
 		}
-		if (historyBox.Children.Count == 0) historyBox.Children.Add(L("Henüz kayıt yok.", 14, false, Muted));
 	}
 
-	void RefreshCourses()
+	// ---------- ayarlar ----------
+	View BuildSettingsView()
 	{
+		hexEntry = Field("#RRGGBB"); hexEntry.MaxLength = 7; hexEntry.HorizontalTextAlignment = TextAlignment.Center; hexEntry.WidthRequest = 120;
+		hexEntry.Completed += (_, _) => ApplyHex();
+		var hexRow = new HorizontalStackLayout { Spacing = 10, Children = { Lbl("Özel renk:", 14, false, Muted), hexEntry } };
+		hexRow.Children[0].VerticalOptions = LayoutOptions.Center;
+
+		goalEntry = Field("2", false, Keyboard.Numeric); goalEntry.WidthRequest = 90; goalEntry.HorizontalTextAlignment = TextAlignment.Center;
+		goalEntry.Completed += (_, _) => ApplyGoal(); goalEntry.Unfocused += (_, _) => ApplyGoal();
+		var goalRow = new HorizontalStackLayout { Spacing = 10, Children = { Lbl("Günlük hedef:", 14, false, Muted), goalEntry, Lbl("saat", 14, false, Muted) } };
+		goalRow.Children[0].VerticalOptions = goalRow.Children[2].VerticalOptions = LayoutOptions.Center;
+
+		var courseName = Field("Yeni ders adı"); courseName.MaxLength = 40;
+		var addBtn = Pill("Ders ekle", true);
+		void Add()
+		{
+			var n = courseName.Text?.Trim();
+			if (string.IsNullOrEmpty(n) || data.Courses.Any(c => c.Name.Equals(n, StringComparison.CurrentCultureIgnoreCase))) return;
+			var c = new Course { Name = n, Color = Palette[data.Courses.Count % Palette.Length] };
+			data.Courses.Add(c); pickedCourseId = c.Id; courseName.Text = ""; Changed();
+		}
+		Tap(addBtn, Add); courseName.Completed += (_, _) => Add();
+
+		var resets = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
+		foreach (var (key, name) in new[] { ("today", "Bugünü sıfırla"), ("week", "Bu haftayı sıfırla"), ("month", "Bu ayı sıfırla") })
+		{
+			var k = key; var b = Pill(name, false, Danger); b.Margin = new Thickness(0, 0, 8, 8);
+			Tap(b, () => ResetPeriod(k, name)); resets.Children.Add(b);
+		}
+
+		return Scroll(new VerticalStackLayout
+		{
+			Padding = new Thickness(20, 8, 20, 24),
+			Children =
+			{
+				Lbl("Ayarlar", 26, true),
+				Head("TEMA RENGİ"),
+				Card(new VerticalStackLayout { Spacing = 12, Children = { Lbl("Halka, düğmeler, seçili öğeler ve arka plan ışığı bu rengi kullanır.", 13, false, Muted), swatchRow, hexRow } }, 18),
+				Head("DERSLER"),
+				Card(new VerticalStackLayout { Spacing = 10, Children = { courseName, addBtn, courseBox } }, 16),
+				Head("HEDEF"), Card(goalRow, 16),
+				Head("SENKRONİZASYON"),
+				Card(new VerticalStackLayout { Spacing = 10, Children = { Lbl("Telefon ve bilgisayardaki çalışmalar aynı hesapta birleşir. Veriler önce bu cihazda tutulur; internet yokken de çalışır.", 13, false, Muted), accountBox } }, 18),
+				Head("SÜRELERİ SIFIRLA"),
+				Card(new VerticalStackLayout { Spacing = 10, Children = { Lbl("Seçtiğin dönemdeki tüm çalışma kayıtları silinir. Geri alınamaz.", 13, false, Muted), resets } }, 18)
+			}
+		});
+	}
+
+	void RefreshSettings()
+	{
+		swatchRow.Children.Clear();
+		var cur = accent;
+		foreach (var hex in Swatches)
+		{
+			var h = hex; var col = Color.FromArgb(hex);
+			bool on = Math.Abs(col.Red - cur.Red) + Math.Abs(col.Green - cur.Green) + Math.Abs(col.Blue - cur.Blue) < 0.01;
+			var dot = new Border
+			{
+				WidthRequest = 40, HeightRequest = 40, BackgroundColor = col, Margin = new Thickness(0, 0, 10, 10),
+				StrokeShape = new RoundRectangle { CornerRadius = 20 }, StrokeThickness = on ? 3 : 1,
+				Stroke = on ? Colors.White : Color.FromRgba(255, 255, 255, 85)
+			};
+			Tap(dot, () => SetColor(h)); swatchRow.Children.Add(dot);
+		}
+		if (!hexEntry.IsFocused) hexEntry.Text = data.WidgetColor.ToUpperInvariant();
+		if (!goalEntry.IsFocused) goalEntry.Text = data.DailyGoalHours.ToString("0.##", Tr);
+
 		courseBox.Children.Clear();
 		foreach (var c in data.Courses.ToList())
 		{
-			var del = new Button { Text = "Sil", BackgroundColor = Colors.Transparent, TextColor = Danger, WidthRequest = 72 };
 			var course = c;
-			del.Clicked += async (_, _) =>
+			var del = Lbl("Sil", 14, true, Danger); del.Padding = new Thickness(12, 8); del.VerticalOptions = LayoutOptions.Center;
+			Tap(del, async () =>
 			{
 				if (Active && runCourseId == course.Id) { await DisplayAlert("Ders", "Çalışan seans bu dersi kullanıyor.", "Tamam"); return; }
-				if (await DisplayAlert("Ders sil", $"\"{course.Name}\" ve tüm kayıtları silinsin mi?", "Sil", "Vazgeç")) { data.DeleteCourse(course); Changed(); }
-			};
-			var row = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, BackgroundColor = Panel, Padding = new Thickness(14, 6) };
-			row.Add(L(c.Name, 15, true, Color.FromArgb(c.Color)), 0, 0);
-			row.Add(del, 1, 0);
+				if (await DisplayAlert("Dersi sil", $"\"{course.Name}\" ve tüm kayıtları silinsin mi? Geri alınamaz.", "Sil", "Vazgeç")) { data.DeleteCourse(course); Changed(); }
+			});
+			var row = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) }, Padding = new Thickness(4, 0) };
+			row.Add(new BoxView { WidthRequest = 10, HeightRequest = 10, CornerRadius = 5, Color = Parse(c.Color, accent), VerticalOptions = LayoutOptions.Center }, 0, 0);
+			row.Add(Lbl(c.Name, 15, true), 1, 0); row.Add(del, 2, 0);
 			courseBox.Children.Add(row);
 		}
+	}
+
+	void SetColor(string hex)
+	{
+		data.WidgetColor = hex.ToUpperInvariant(); Store.Save(data); sync.MarkDirty(); ApplyTheme(); RefreshAll();
+	}
+
+	void ApplyHex()
+	{
+		var t = (hexEntry.Text ?? "").Trim();
+		if (!t.StartsWith('#')) t = "#" + t;
+		if (t.Length == 7 && t[1..].All(Uri.IsHexDigit)) SetColor(t);
+		else hexEntry.Text = data.WidgetColor.ToUpperInvariant();
+	}
+
+	void ApplyGoal()
+	{
+		if (double.TryParse((goalEntry.Text ?? "").Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var g) && g > 0 && g <= 24
+			&& Math.Abs(g - data.DailyGoalHours) > 0.001)
+		{ data.DailyGoalHours = g; Store.Save(data); sync.MarkDirty(); }
+		goalEntry.Text = data.DailyGoalHours.ToString("0.##", Tr);
+	}
+
+	async void ResetPeriod(string key, string title)
+	{
+		var from = PeriodFrom(key);
+		if (!await DisplayAlert(title, "Bu dönemdeki tüm çalışma kayıtları silinecek. Geri alınamaz.", "Sıfırla", "Vazgeç")) return;
+		data.DeleteSessions(s => s.Start >= from);
+		if (Active && runStart >= from) { runCourseId = null; runningSince = null; accumulated = 0; PersistTimer(); }
+		Changed();
 	}
 
 	// Giriş alanları yazılırken sync durumu değişirse form silinmesin
@@ -231,25 +594,23 @@ public class MainPage : ContentPage
 
 	void RefreshAccount()
 	{
-		if (!sync.SignedIn && mailBox != null && accountBox.Children.Contains(mailBox))
-		{ return; }
+		if (!sync.SignedIn && mailBox != null && accountBox.Children.Contains(mailBox)) return;
 		accountBox.Children.Clear();
 		if (sync.SignedIn)
 		{
 			mailBox = passBox = null;
-			var outBtn = B("Çıkış yap", Panel, TextC);
-			outBtn.Clicked += (_, _) => { sync.SignOut(); RefreshAccount(); };
-			var nowBtn = B("Şimdi senkronla", Panel, TextC);
-			nowBtn.Clicked += async (_, _) => await sync.SyncAsync();
-			accountBox.Children.Add(L(sync.Email, 15, true));
-			accountBox.Children.Add(L(sync.Status, 13, false, Muted));
+			var outBtn = Pill("Çıkış yap", false, Danger); var nowBtn = Pill("Şimdi senkronla", false);
+			Tap(outBtn, () => { sync.SignOut(); RefreshAccount(); RefreshSyncDot(); });
+			Tap(nowBtn, async () => await sync.SyncAsync());
+			accountBox.Children.Add(Lbl(sync.Email, 15, true));
+			accountBox.Children.Add(Lbl(sync.Status, 13, false, accent));
 			accountBox.Children.Add(nowBtn); accountBox.Children.Add(outBtn);
 			return;
 		}
-		mailBox = E("E-posta", false, Keyboard.Email);
-		passBox = E("Şifre", true);
-		authMsg = L("", 13, false, Danger);
-		var login = B("Giriş yap"); var reg = B("Kayıt ol", Panel, TextC);
+		mailBox = Field("E-posta", false, Keyboard.Email);
+		passBox = Field("Şifre", true);
+		authMsg = Lbl("", 13, false, Danger);
+		var login = Pill("Giriş yap", true); var reg = Pill("Kayıt ol", false);
 		async Task Do(Func<string, string, Task<string?>> f)
 		{
 			authMsg!.Text = "Bekleyin…";
@@ -257,35 +618,49 @@ public class MainPage : ContentPage
 			if (err != null) authMsg.Text = err;
 			else { mailBox = null; RefreshAll(); ShowTab(0); await sync.SyncAsync(); }
 		}
-		login.Clicked += async (_, _) => await Do(sync.SignInAsync);
-		reg.Clicked += async (_, _) => await Do(sync.SignUpAsync);
-		accountBox.Children.Add(L("PC ile aynı hesapla giriş yap; veriler senkron olur. İstersen giriş yapmadan da kullanabilirsin.", 13, false, Muted));
+		Tap(login, async () => await Do(sync.SignInAsync)); Tap(reg, async () => await Do(sync.SignUpAsync));
+		accountBox.Children.Add(Lbl("PC ile aynı hesapla giriş yap; veriler senkron olur. İstersen giriş yapmadan da kullanabilirsin.", 13, false, Muted));
 		accountBox.Children.Add(mailBox); accountBox.Children.Add(passBox); accountBox.Children.Add(authMsg);
 		accountBox.Children.Add(login); accountBox.Children.Add(reg);
 	}
 
-	void Changed()
+	// ---------- gezinme / yenileme ----------
+	void ShowTab(int i)
 	{
-		Store.Save(data); sync.MarkDirty(); RefreshAll();
+		tab = i;
+		for (int k = 0; k < 4; k++) { views[k].IsVisible = k == i; StyleNav(k); }
+		RefreshAll();
 	}
 
-	// ---------- zamanlayıcı ----------
+	void RefreshAll()
+	{
+		RefreshChips(); RefreshTimer(); RefreshSyncDot();
+		if (tab == 1) RefreshStats();
+		if (tab == 2) RefreshHistory();
+		if (tab == 3) { RefreshSettings(); RefreshAccount(); }
+	}
 
+	void Changed() { Store.Save(data); sync.MarkDirty(); RefreshAll(); }
+
+	// ---------- zamanlayıcı ----------
 	void ToggleTimer()
 	{
+		Buzz();
 		if (!Active)
 		{
-			var c = Selected; if (c == null) return;
-			runCourseId = c.Id; runStart = DateTime.Now; accumulated = 0; runningSince = DateTime.UtcNow; LastCourse = c.Id;
+			var c = CurrentCourse; if (c == null) return;
+			runCourseId = c.Id; runStart = DateTime.Now; accumulated = 0; runningSince = DateTime.UtcNow; pickedCourseId = c.Id;
+			Preferences.Set("lastCourse", c.Id);
 		}
-		else if (runningSince != null) { accumulated = Elapsed; runningSince = null; }
+		else if (Running) { accumulated = Elapsed; runningSince = null; }
 		else runningSince = DateTime.UtcNow;
-		PersistTimer(); RefreshTimer();
+		PersistTimer(); RefreshChips(); RefreshTimer();
 	}
 
 	void Commit()
 	{
 		if (!Active) return;
+		Buzz();
 		int s = (int)Elapsed;
 		if (s >= 5) data.Sessions.Add(new Session { CourseId = runCourseId!, Start = runStart, Seconds = s });
 		runCourseId = null; runningSince = null; accumulated = 0;
@@ -321,4 +696,55 @@ public class MainPage : ContentPage
 
 	public void OnResumed() { RefreshAll(); _ = sync.SyncAsync(); }
 	public void OnStopped() { PersistTimer(); Store.Save(data); }
+
+	// ---------- çizimler ----------
+	sealed class RingDrawable : IDrawable
+	{
+		public Color Accent = Colors.CornflowerBlue; public double Frac; public bool Glow = true;
+
+		public void Draw(ICanvas canvas, RectF r)
+		{
+			float cx = r.Center.X, cy = r.Center.Y, rad = Math.Min(r.Width, r.Height) / 2 - 18;
+			var box = new RectF(cx - rad, cy - rad, rad * 2, rad * 2);
+			canvas.StrokeLineCap = LineCap.Round;
+			canvas.StrokeColor = Color.FromRgba(255, 255, 255, 48);
+			canvas.StrokeSize = 18;
+			canvas.DrawCircle(cx, cy, rad);
+			if (Frac < 0.002) return;
+			float sweep = (float)(Math.Min(Frac, 0.9999) * 360);
+			float end = 90 - sweep; if (end < 0) end += 360;
+			if (Glow)
+			{
+				canvas.StrokeColor = Accent.WithAlpha(0.18f); canvas.StrokeSize = 34;
+				canvas.DrawArc(box.X, box.Y, box.Width, box.Height, 90, end, true, false);
+				canvas.StrokeColor = Accent.WithAlpha(0.28f); canvas.StrokeSize = 26;
+				canvas.DrawArc(box.X, box.Y, box.Width, box.Height, 90, end, true, false);
+			}
+			canvas.StrokeColor = Accent; canvas.StrokeSize = 18;
+			canvas.DrawArc(box.X, box.Y, box.Width, box.Height, 90, end, true, false);
+		}
+	}
+
+	sealed class IconDrawable : IDrawable
+	{
+		public int Kind; public Color Color = Colors.White; // 0 oynat, 1 duraklat, 2 durdur
+		public IconDrawable(int kind) => Kind = kind;
+
+		public void Draw(ICanvas canvas, RectF r)
+		{
+			canvas.FillColor = Color; canvas.StrokeColor = Color;
+			float w = r.Width, h = r.Height;
+			switch (Kind)
+			{
+				case 0:
+					var p = new PathF(); p.MoveTo(w * 0.22f, h * 0.08f); p.LineTo(w * 0.92f, h * 0.5f); p.LineTo(w * 0.22f, h * 0.92f); p.Close();
+					canvas.StrokeSize = 5; canvas.StrokeLineJoin = LineJoin.Round; canvas.FillPath(p); canvas.DrawPath(p); break;
+				case 1:
+					canvas.FillRoundedRectangle(w * 0.14f, h * 0.06f, w * 0.26f, h * 0.88f, 4);
+					canvas.FillRoundedRectangle(w * 0.60f, h * 0.06f, w * 0.26f, h * 0.88f, 4); break;
+				default:
+					canvas.FillRoundedRectangle(w * 0.1f, h * 0.1f, w * 0.8f, h * 0.8f, 7); break;
+			}
+		}
+	}
 }
