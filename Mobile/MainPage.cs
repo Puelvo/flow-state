@@ -87,7 +87,13 @@ public class MainPage : ContentPage
 	}
 
 	static Entry Field(string ph, bool pw = false, Keyboard? kb = null) => new()
-	{ Placeholder = ph, IsPassword = pw, Keyboard = kb ?? Keyboard.Default, TextColor = Text, PlaceholderColor = Muted, BackgroundColor = Panel2 };
+	{ Placeholder = ph, IsPassword = pw, Keyboard = kb ?? Keyboard.Default, TextColor = Text, PlaceholderColor = Muted };
+
+	static Border Dot(Color c, double size) => new()
+	{
+		WidthRequest = size, HeightRequest = size, StrokeThickness = 0, BackgroundColor = c, Padding = 0,
+		StrokeShape = new RoundRectangle { CornerRadius = (float)(size / 2) }, VerticalOptions = LayoutOptions.Center
+	};
 
 	static void Buzz() { try { HapticFeedback.Default.Perform(HapticFeedbackType.Click); } catch { } }
 
@@ -117,7 +123,7 @@ public class MainPage : ContentPage
 		BuildBackground();
 		views[0] = BuildTimerView();
 		views[1] = Scroll(new VerticalStackLayout { Padding = new Thickness(20, 8, 20, 24), Children = { Lbl("İstatistikler", 26, true), statsBox } });
-		views[2] = Scroll(new VerticalStackLayout { Padding = new Thickness(20, 8, 20, 24), Children = { Lbl("Geçmiş", 26, true), new BoxView { HeightRequest = 8, Color = Colors.Transparent }, historyBox } });
+		views[2] = Scroll(new VerticalStackLayout { Padding = new Thickness(20, 8, 20, 24), Children = { Lbl("Geçmiş", 26, true), new Grid { HeightRequest = 8 }, historyBox } });
 		views[3] = BuildSettingsView();
 		foreach (var v in views) { v.IsVisible = false; body.Children.Add(v); }
 
@@ -152,7 +158,7 @@ public class MainPage : ContentPage
 		B(blob4, 380, LayoutOptions.Start, LayoutOptions.End, new Thickness(-170, 0, 0, -150));
 	}
 
-	static RadialGradientBrush Glow(Color c, double a) => new(new[]
+	static RadialGradientBrush Glow(Color c, double a) => new(new GradientStopCollection
 	{
 		new GradientStop(Alpha(c, a), 0f), new GradientStop(Alpha(c, 0), 1f)
 	}) { Center = new Point(0.5, 0.5), Radius = 0.5 };
@@ -164,10 +170,10 @@ public class MainPage : ContentPage
 		sel = Tint(accent, 0.30, 22);
 		Background = new LinearGradientBrush(new GradientStopCollection
 		{
-			new GradientStop(Tint(accent, 0.09, 5), 0f), new GradientStop(Tint(accent, 0.20, 8), 1f)
+			new GradientStop(Tint(accent, 0.06, 5), 0f), new GradientStop(Tint(accent, 0.13, 8), 1f)
 		}, new Point(0, 0), new Point(1, 1));
-		blob1.Background = Glow(accent, 0.44); blob2.Background = Glow(Lighten(accent, 0.35), 0.31);
-		blob3.Background = Glow(accent, 0.47); blob4.Background = Glow(Tint(accent, 0.75, 0), 0.33);
+		blob1.Background = Glow(accent, 0.30); blob2.Background = Glow(Lighten(accent, 0.35), 0.20);
+		blob3.Background = Glow(accent, 0.30); blob4.Background = Glow(Tint(accent, 0.75, 0), 0.20);
 		ring.Accent = accent; startIcon.Color = Color.FromArgb("#0A0E1A"); stopIcon.Color = Text;
 		if (startBtn != null) startBtn.BackgroundColor = accent;
 		for (int i = 0; i < 4; i++) StyleNav(i);
@@ -244,9 +250,9 @@ public class MainPage : ContentPage
 			Children =
 			{
 				new Grid { Padding = new Thickness(16, 0), Children = { chipScroll } },
-				new BoxView { HeightRequest = 6, Color = Colors.Transparent },
+				new Grid { HeightRequest = 6 },
 				ringHost, timeLabel, pips, pipsLabel,
-				new BoxView { HeightRequest = 6, Color = Colors.Transparent }, btns
+				new Grid { HeightRequest = 6 }, btns
 			}
 		});
 	}
@@ -263,7 +269,7 @@ public class MainPage : ContentPage
 				Spacing = 8,
 				Children =
 				{
-					new BoxView { WidthRequest = 10, HeightRequest = 10, CornerRadius = 5, Color = Parse(c.Color, accent), VerticalOptions = LayoutOptions.Center },
+					Dot(Parse(c.Color, accent), 10),
 					Lbl(c.Name, 14)
 				}
 			};
@@ -315,7 +321,7 @@ public class MainPage : ContentPage
 		int laps = s / 3600;
 		pips.Children.Clear();
 		for (int i = 0; i < Math.Min(laps, 12); i++)
-			pips.Children.Add(new BoxView { WidthRequest = 12, HeightRequest = 12, CornerRadius = 6, Color = accent });
+			pips.Children.Add(Dot(accent, 12));
 		if (laps > 12) pips.Children.Add(Lbl($"+{laps - 12}", 13, false, Text));
 		if (Active)
 			pips.Children.Add(new Border { WidthRequest = 12, HeightRequest = 12, StrokeThickness = 1.5, Stroke = accent, BackgroundColor = Colors.Transparent, StrokeShape = new RoundRectangle { CornerRadius = 6 } });
@@ -463,7 +469,7 @@ public class MainPage : ContentPage
 			{
 				if (await DisplayAlert("Kaydı sil", "Bu çalışma kaydı silinsin mi?", "Sil", "Vazgeç")) { data.DeleteSession(sess); Changed(); }
 			});
-			var dot = new BoxView { WidthRequest = 10, HeightRequest = 10, CornerRadius = 5, Color = Parse(c?.Color ?? "#8791B5", Muted), VerticalOptions = LayoutOptions.Center };
+			var dot = Dot(Parse(c?.Color ?? "#8791B5", Muted), 10);
 			var info = new VerticalStackLayout { Spacing = 2, Children = { Lbl(c?.Name ?? "(silinmiş ders)", 15, true), Lbl(s.Start.ToString("d MMM yyyy HH:mm", Tr), 12, false, Muted) } };
 			var dur = Lbl(Fmt(s.Seconds), 14, true); dur.VerticalOptions = LayoutOptions.Center;
 			var row = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto) } };
@@ -479,12 +485,12 @@ public class MainPage : ContentPage
 		hexEntry = Field("#RRGGBB"); hexEntry.MaxLength = 7; hexEntry.HorizontalTextAlignment = TextAlignment.Center; hexEntry.WidthRequest = 120;
 		hexEntry.Completed += (_, _) => ApplyHex();
 		var hexRow = new HorizontalStackLayout { Spacing = 10, Children = { Lbl("Özel renk:", 14, false, Muted), hexEntry } };
-		hexRow.Children[0].VerticalOptions = LayoutOptions.Center;
+		((View)hexRow.Children[0]).VerticalOptions = LayoutOptions.Center;
 
 		goalEntry = Field("2", false, Keyboard.Numeric); goalEntry.WidthRequest = 90; goalEntry.HorizontalTextAlignment = TextAlignment.Center;
 		goalEntry.Completed += (_, _) => ApplyGoal(); goalEntry.Unfocused += (_, _) => ApplyGoal();
 		var goalRow = new HorizontalStackLayout { Spacing = 10, Children = { Lbl("Günlük hedef:", 14, false, Muted), goalEntry, Lbl("saat", 14, false, Muted) } };
-		goalRow.Children[0].VerticalOptions = goalRow.Children[2].VerticalOptions = LayoutOptions.Center;
+		((View)goalRow.Children[0]).VerticalOptions = ((View)goalRow.Children[2]).VerticalOptions = LayoutOptions.Center;
 
 		var courseName = Field("Yeni ders adı"); courseName.MaxLength = 40;
 		var addBtn = Pill("Ders ekle", true);
@@ -553,7 +559,7 @@ public class MainPage : ContentPage
 				if (await DisplayAlert("Dersi sil", $"\"{course.Name}\" ve tüm kayıtları silinsin mi? Geri alınamaz.", "Sil", "Vazgeç")) { data.DeleteCourse(course); Changed(); }
 			});
 			var row = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) }, Padding = new Thickness(4, 0) };
-			row.Add(new BoxView { WidthRequest = 10, HeightRequest = 10, CornerRadius = 5, Color = Parse(c.Color, accent), VerticalOptions = LayoutOptions.Center }, 0, 0);
+			row.Add(Dot(Parse(c.Color, accent), 10), 0, 0);
 			row.Add(Lbl(c.Name, 15, true), 1, 0); row.Add(del, 2, 0);
 			courseBox.Children.Add(row);
 		}
