@@ -1,0 +1,12 @@
+# Derleme çıktıları
+bin/
+obj/
+dist/
+Mobile/bin/
+Mobile/obj/
+*.user
+.vs/
+# Yerel veri / yedekler
+data*.json
+sync.json
+*.tmp
