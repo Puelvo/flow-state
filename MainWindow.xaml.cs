@@ -18,11 +18,12 @@ public partial class MainWindow : Window
         { "#4F8CFF", "#F2994A", "#27AE60", "#BB6BD9", "#EB5757", "#2D9CDB", "#F2C94C", "#56CCF2" };
 
     readonly AppData data = Store.Load();
-    readonly Stopwatch sw = new();
+    readonly ClockTimer sw = new();
     readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
 
     bool active;                    // oturum var (çalışıyor ya da duraklatılmış)
     string activeCourseId = "";
+    string activeRunId = "";
     DateTime activeStart;
     int lastCheckpoint;
     int lastTickSecond = -1;
@@ -40,7 +41,8 @@ public partial class MainWindow : Window
         // Önceki çalışma çökme/kapanma ile yarım kaldıysa kaydet.
         if (data.Active is { } a)
         {
-            if (a.Seconds >= 5)
+            // Paylaşılan seans hâlâ sürüyorsa (başka cihaz bitirmedi) kaydetme; zamanlayıcı aşağıda canlı durumdan sürer.
+            if (a.Seconds >= 5 && !data.Live.Active)
                 data.Sessions.Add(new Session { CourseId = a.CourseId, Start = a.Start, Seconds = a.Seconds });
             data.Active = null;
             Store.Save(data);
@@ -61,9 +63,11 @@ public partial class MainWindow : Window
 
         sync = new SyncService(data, new DispatcherSynchronizationContext(Dispatcher), new WindowsSecretCodec(),
             onDataChanged: () => { Store.Save(data); RefreshCourses(); UpdateAll(); },
-            courseInUse: id => active && activeCourseId == id);
+            courseInUse: id => active && activeCourseId == id,
+            onRemoteLive: OnRemoteLive);
         sync.StatusChanged += RefreshSyncUi;
         RefreshSyncUi();
+        if (data.Live.Active && data.Courses.Any(c => c.Id == data.Live.CourseId)) { ApplyLiveLocal(data.Live); UpdateAll(); }
     }
 
     // ---------- senkronizasyon ----------
@@ -252,11 +256,13 @@ public partial class MainWindow : Window
             active = true;
             activeCourseId = c.Id;
             activeStart = DateTime.Now;
+            activeRunId = Guid.NewGuid().ToString("N");
             lastCheckpoint = 0;
             sw.Restart();
         }
         else if (sw.IsRunning) sw.Stop();
         else sw.Start();
+        PublishLive();
         UpdateAll();
     }
 
@@ -274,13 +280,66 @@ public partial class MainWindow : Window
         if (!active) return;
         sw.Stop();
         int s = (int)sw.Elapsed.TotalSeconds;
-        var courseName = data.Courses.FirstOrDefault(c => c.Id == activeCourseId)?.Name ?? "";
-            data.Sessions.Add(new Session { CourseId = activeCourseId, Start = activeStart, Seconds = s });
+        if (s >= 5)
+            data.Sessions.Add(new Session { Id = RunIdOrNew(), CourseId = activeCourseId, Start = activeStart, Seconds = s });
         active = false;
         sw.Reset();
         data.Active = null;
+        PublishLive();
         Save();
         Title = "Flow State";
+    }
+
+    // ---------- canlı seans: cihazlar arası paylaşım ----------
+
+    string RunIdOrNew() { if (activeRunId.Length == 0) activeRunId = Guid.NewGuid().ToString("N"); return activeRunId; }
+
+    /// <summary>Yerel zamanlayıcı durumunu paylaşılan canlı duruma yazar ve hemen gönderir.</summary>
+    void PublishLive()
+    {
+        data.SetLive(active, RunIdOrNew(), activeCourseId, activeStart, sw.Accumulated, sw.RunningSince);
+        Store.Save(data);
+        sync?.RequestLive();
+    }
+
+    void ApplyLiveLocal(LiveState l)
+    {
+        active = l.Active;
+        activeCourseId = l.CourseId;
+        activeStart = l.Start;
+        activeRunId = l.RunId;
+        lastCheckpoint = 0;
+        lastTickSecond = -1;
+        if (active) sw.Set(l.Accumulated, l.RunningSince);
+        else { sw.Reset(); data.Active = null; Title = "Flow State"; }
+    }
+
+    // UI thread: başka cihazın canlı seansı geldi. Uygulandıysa true.
+    bool OnRemoteLive(LiveState r)
+    {
+        if (r.Active)
+        {
+            if (!data.Courses.Any(c => c.Id == r.CourseId)) return false; // ders henüz gelmedi; sonra denenir
+            if (active && activeRunId != r.RunId)
+            {
+                // Bu cihazdaki ayrı seansın emeği kaybolmasın: kaydet, sonra paylaşılana geç.
+                int s = (int)sw.Elapsed.TotalSeconds;
+                if (s >= 5) data.Sessions.Add(new Session { Id = RunIdOrNew(), CourseId = activeCourseId, Start = activeStart, Seconds = s });
+                Save();
+            }
+        }
+        else if (active && activeRunId != r.RunId)
+        {
+            // Uzaktaki bitiş başka bir seansa ait; bizimki sürüyor. Durumumuzu yenileyip tekrar yayınlarız.
+            data.SetLive(true, activeRunId, activeCourseId, activeStart, sw.Accumulated, sw.RunningSince);
+            Store.Save(data);
+            return false;
+        }
+        ApplyLiveLocal(r);
+        data.Live = r;
+        Store.Save(data);
+        UpdateAll();
+        return true;
     }
 
     // Çember: her saat bir tam tur. İlerleme = saatin kaçta kaçı geçti.
@@ -1153,6 +1212,7 @@ public partial class MainWindow : Window
             active = false;
             data.Active = null;
             Title = "Flow State";
+            PublishLive();
         }
         Save();
         UpdateAll();
@@ -1173,9 +1233,20 @@ public partial class MainWindow : Window
         }
     }
 
-    void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    bool closeFlushed;
+
+    async void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        if (closeFlushed) return;
         Commit();
         Save();
+        if (sync is { SignedIn: true })
+        {
+            // Çıkmadan önce kısa süre senkronla: bitirilen seans ve canlı durum diğer cihaza ulaşsın.
+            e.Cancel = true;
+            try { await Task.WhenAny(sync.SyncAsync(), Task.Delay(4000)); } catch { }
+            closeFlushed = true;
+            Close();
+        }
     }
 }

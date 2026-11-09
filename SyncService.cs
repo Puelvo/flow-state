@@ -43,6 +43,7 @@ public sealed class SyncService
     readonly ISecretCodec codec;
     readonly Action onDataChanged;            // UI thread: yerel veri senkronla değişti
     readonly Func<string, bool> courseInUse;  // UI thread: çalışan seans bu dersi kullanıyor mu
+    readonly Func<LiveState, bool>? onRemoteLive; // UI thread: başka cihazın canlı seansı geldi; uygulandıysa true
     readonly SemaphoreSlim gate = new(1, 1);
     readonly Timer debounce;
     readonly Timer poll;
@@ -57,8 +58,9 @@ public sealed class SyncService
     public event Action? StatusChanged;
 
     public SyncService(AppData data, SynchronizationContext ui, ISecretCodec codec,
-                       Action onDataChanged, Func<string, bool> courseInUse)
+                       Action onDataChanged, Func<string, bool> courseInUse, Func<LiveState, bool>? onRemoteLive = null)
     {
+        this.onRemoteLive = onRemoteLive;
         this.data = data; this.ui = ui; this.codec = codec;
         this.onDataChanged = onDataChanged; this.courseInUse = courseInUse;
         LoadConfig();
@@ -72,7 +74,12 @@ public sealed class SyncService
         }
     }
 
-    void StartPolling() => poll.Change(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    void StartPolling()
+    {
+        poll.Change(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        livePoll ??= new Timer(_ => _ = RunLiveAsync(), null, Timeout.Infinite, Timeout.Infinite);
+        livePoll.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5)); // canlı seans: hafif tek satırlık sorgu
+    }
 
     Task<T> OnUi<T>(Func<T> f)
     {
@@ -136,7 +143,7 @@ public sealed class SyncService
 
     public void SignOut()
     {
-        poll.Change(Timeout.Infinite, Timeout.Infinite); debounce.Change(Timeout.Infinite, Timeout.Infinite);
+        poll.Change(Timeout.Infinite, Timeout.Infinite); debounce.Change(Timeout.Infinite, Timeout.Infinite); livePoll?.Change(Timeout.Infinite, Timeout.Infinite);
         cfg = new SyncConfig(); accessToken = ""; accessExpiresUtc = DateTime.MinValue;
         try { File.Delete(CfgPath); } catch { }
         SetStatus("Giriş yapılmadı");
@@ -202,6 +209,7 @@ public sealed class SyncService
             cfg.LastPushedUtc = startedUtc;
             SaveConfig();
             SetStatus($"Senkron tamam · {DateTime.Now:HH:mm:ss}");
+            await RunLiveAsync();
         }
         catch (Exception ex) { SetStatus("Çevrimdışı / hata: " + ex.Message); }
         finally { gate.Release(); }
@@ -387,6 +395,72 @@ public sealed class SyncService
             }
         }
         return changed;
+    }
+
+
+    // ---------- canlı seans (şu an çalışılan) ----------
+
+    readonly SemaphoreSlim liveGate = new(1, 1);
+    Timer? livePoll;
+    DateTime liveSentAt = DateTime.MinValue;
+    volatile bool livePending;
+
+    /// <summary>Yerel canlı durum değişti (başlat/duraklat/bitir): hemen gönder.</summary>
+    public void RequestLive()
+    {
+        if (!SignedIn) return;
+        livePending = true;
+        _ = RunLiveAsync();
+    }
+
+    async Task RunLiveAsync()
+    {
+        if (!SignedIn || !await liveGate.WaitAsync(0)) return;
+        try
+        {
+            do { livePending = false; await LiveOnceAsync(); } while (livePending);
+        }
+        catch { /* live_session tablosu yoksa ya da bağlantı yoksa sessizce atla; ana senkronu etkilemez */ }
+        finally { liveGate.Release(); }
+    }
+
+    async Task LiveOnceAsync()
+    {
+        if (!await EnsureTokenAsync()) return;
+        var arr = JsonNode.Parse(await SendAsync(HttpMethod.Get, $"{BaseUrl}/rest/v1/live_session?select=*&limit=1", null))!.AsArray();
+        JsonObject? row = arr.Count > 0 ? (JsonObject)arr[0]! : null;
+        var remoteUpd = row != null ? ParseUtc(row["updated_at"]!.ToString()) : DateTime.MinValue;
+        var local = await OnUi(() => data.Live);
+
+        if (row != null && remoteUpd > U(local.UpdatedAt))
+        {
+            var remote = new LiveState
+            {
+                Active = row["active"]!.GetValue<bool>(),
+                RunId = row["run_id"]?.ToString() ?? "",
+                CourseId = row["course_id"]?.ToString() ?? "",
+                Start = row["started_at"] is { } sa ? ParseUtc(sa.ToString()).ToLocalTime() : DateTime.Now,
+                Accumulated = row["accumulated"]?.GetValue<double>() ?? 0,
+                RunningSince = row["running_since"] is { } rs ? ParseUtc(rs.ToString()) : null,
+                UpdatedAt = remoteUpd
+            };
+            bool applied = onRemoteLive == null || await OnUi(() => onRemoteLive(remote));
+            if (applied) { liveSentAt = remoteUpd; return; }
+            local = await OnUi(() => data.Live); // uygulama kendi çalışan seansını korudu ve durumu yeniledi olabilir
+        }
+
+        if (U(local.UpdatedAt) > liveSentAt && U(local.UpdatedAt) > remoteUpd)
+        {
+            var body = new JsonObject
+            {
+                ["user_id"] = cfg.UserId, ["active"] = local.Active, ["run_id"] = local.RunId, ["course_id"] = local.CourseId,
+                ["started_at"] = Iso(local.Start), ["accumulated"] = local.Accumulated,
+                ["running_since"] = local.RunningSince is { } r ? Iso(r) : null, ["updated_at"] = Iso(local.UpdatedAt)
+            };
+            await SendAsync(HttpMethod.Post, $"{BaseUrl}/rest/v1/live_session?on_conflict=user_id", body.ToJsonString(),
+                "resolution=merge-duplicates,return=minimal");
+            liveSentAt = U(local.UpdatedAt);
+        }
     }
 
     // ---------- yardımcılar ----------
