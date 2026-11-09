@@ -2,9 +2,12 @@
 
 Ders çalışma süresi takip uygulaması: Windows (WPF, .NET 9) + Android (MAUI), Supabase ile senkron.
 
-## Çalıştırma
-- **Masaüstü:** `dist\FlowState.exe` dosyasına çift tıkla. (Bilgisayarda .NET 9 Desktop Runtime gerekir; .NET SDK kuruluysa zaten vardır.)
-- **Android:** `dist\FlowState.apk` dosyasını telefona kur.
+## Kurulum
+GitHub deposunun **Releases** bölümünden en son sürümü aç:
+- **Windows:** `FlowState-Windows.exe` dosyasını indirip çift tıkla. .NET kurulumu gerekmez.
+- **Android:** `FlowState.apk` dosyasını telefona indirip kur. İlk kurulumda "bilinmeyen kaynaklardan yüklemeye izin ver" açılmalı.
+
+Geliştirme için: masaüstünde `dist\FlowState.exe` (.NET 9 Desktop Runtime gerekir), telefonda `dist\FlowState.apk`.
 
 ## Özellikler
 - **Çalış:** Sayaç rakamı yok; çalıştıkça dolan bir çember var. Her saat çember 1 tur atar, tamamlanan saatler altta nokta olarak görünür. Çember dersin rengini alır (geçişli).
