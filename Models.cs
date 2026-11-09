@@ -68,6 +68,18 @@ public class AppData
         if (Courses.Remove(c)) Tombstones.Add(new Tombstone { Id = c.Id, Kind = "course" });
     }
 
+    public LiveState Live { get; set; } = new();
+
+    /// <summary>Paylaşılan canlı seans durumunu şimdi güncellenmiş olarak yazar (senkronda en yeni kazanır).</summary>
+    public void SetLive(bool active, string runId, string courseId, DateTime start, double accumulated, DateTime? runningSince)
+    {
+        Live = new LiveState
+        {
+            Active = active, RunId = runId, CourseId = courseId, Start = start,
+            Accumulated = accumulated, RunningSince = runningSince, UpdatedAt = DateTime.UtcNow
+        };
+    }
+
     public ActiveSession? Active { get; set; }
     public double DailyGoalHours { get; set; } = 2;
     public string WidgetColor { get; set; } = "#5B8CFF"; // widget tema rengi (#RRGGBB)
@@ -135,4 +147,40 @@ public static class Store
         }
         catch { /* disk hatasında uygulama çalışmaya devam etsin */ }
     }
+}
+
+/// <summary>
+/// Cihazlar arası paylaşılan "şu an çalışılan seans" durumu. Zaman damgalarından hesaplanır
+/// (geçen süre = Accumulated + şimdi − RunningSince), bu yüzden her cihaz aynı süreyi görür.
+/// En yeni UpdatedAt kazanır.
+/// </summary>
+public class LiveState
+{
+    public bool Active { get; set; }
+    public string RunId { get; set; } = "";       // seansın kalıcı kimliği; bitince Session.Id olur
+    public string CourseId { get; set; } = "";
+    public DateTime Start { get; set; }           // yerel saat (Session.Start gibi)
+    public double Accumulated { get; set; }       // duraklatmalardan önce biriken saniye
+    public DateTime? RunningSince { get; set; }   // UTC; null = duraklatılmış
+    public DateTime UpdatedAt { get; set; } = DateTime.MinValue; // UTC; MinValue = hiç ayarlanmadı
+
+    public double Elapsed => Accumulated + (RunningSince is { } r ? Math.Max(0, (DateTime.UtcNow - r).TotalSeconds) : 0);
+}
+
+/// <summary>Stopwatch yerine zaman damgalı sayaç: başka cihazdan gelen durumu doğrudan alabilir.</summary>
+public sealed class ClockTimer
+{
+    double acc;
+    DateTime? since; // UTC
+
+    public bool IsRunning => since != null;
+    public TimeSpan Elapsed => TimeSpan.FromSeconds(acc + (since is { } s ? Math.Max(0, (DateTime.UtcNow - s).TotalSeconds) : 0));
+    public double Accumulated => acc;
+    public DateTime? RunningSince => since;
+
+    public void Start() { since ??= DateTime.UtcNow; }
+    public void Stop() { acc = Elapsed.TotalSeconds; since = null; }
+    public void Reset() { acc = 0; since = null; }
+    public void Restart() { acc = 0; since = DateTime.UtcNow; }
+    public void Set(double accumulated, DateTime? runningSince) { acc = accumulated; since = runningSince; }
 }

@@ -24,7 +24,7 @@ public class MainPage : ContentPage
 	// ---------- veri / zamanlayıcı ----------
 	readonly AppData data;
 	readonly SyncService sync;
-	string? runCourseId; DateTime runStart; double accumulated; DateTime? runningSince;
+	string? runCourseId; string runId = ""; DateTime runStart; double accumulated; DateTime? runningSince;
 	bool Active => runCourseId != null;
 	bool Running => runningSince != null;
 	double Elapsed => accumulated + (runningSince is { } r ? (DateTime.UtcNow - r).TotalSeconds : 0);
@@ -116,7 +116,7 @@ public class MainPage : ContentPage
 		RestoreTimer();
 		sync = new SyncService(data, SynchronizationContext.Current ?? new SynchronizationContext(),
 			new AndroidSecretCodec(), () => MainThread.BeginInvokeOnMainThread(RefreshAll),
-			id => Active && runCourseId == id);
+			id => Active && runCourseId == id, OnRemoteLive);
 		sync.StatusChanged += () => MainThread.BeginInvokeOnMainThread(() => { RefreshAccount(); RefreshSyncDot(); });
 
 		pickedCourseId = Preferences.Get("lastCourse", "");
@@ -738,7 +738,7 @@ public class MainPage : ContentPage
 		var from = PeriodFrom(key);
 		if (!await DisplayAlert(title, "Bu dönemdeki tüm çalışma kayıtları silinecek. Geri alınamaz.", "Sıfırla", "Vazgeç")) return;
 		data.DeleteSessions(s => s.Start >= from);
-		if (Active && runStart >= from) { runCourseId = null; runningSince = null; accumulated = 0; PersistTimer(); SyncNotification(); }
+		if (Active && runStart >= from) { runCourseId = null; runningSince = null; accumulated = 0; PersistTimer(); data.SetLive(false, RunIdOrNew(), "", runStart, 0, null); sync.RequestLive(); SyncNotification(); }
 		Changed();
 	}
 
@@ -793,7 +793,13 @@ public class MainPage : ContentPage
 		if (tab == 3) { RefreshSettings(); RefreshAccount(); }
 	}
 
-	void Changed() { Store.Save(data); sync.MarkDirty(); RefreshAll(); }
+	void Changed()
+	{
+		Store.Save(data); sync.MarkDirty(); RefreshAll();
+#if ANDROID
+		TimerWidget.Refresh();
+#endif
+	}
 
 	// ---------- zamanlayıcı ----------
 	void ToggleTimer()
@@ -802,13 +808,13 @@ public class MainPage : ContentPage
 		if (!Active)
 		{
 			var c = CurrentCourse; if (c == null) return;
-			runCourseId = c.Id; runStart = DateTime.Now; accumulated = 0; runningSince = DateTime.UtcNow; pickedCourseId = c.Id;
+			runCourseId = c.Id; runStart = DateTime.Now; accumulated = 0; runningSince = DateTime.UtcNow; pickedCourseId = c.Id; runId = Guid.NewGuid().ToString("N");
 			Preferences.Set("lastCourse", c.Id);
 			_ = AskNotifyPermission();
 		}
 		else if (Running) { accumulated = Elapsed; runningSince = null; }
 		else runningSince = DateTime.UtcNow;
-		PersistTimer(); SyncNotification(); RefreshChips(); RefreshTimer();
+		PersistTimer(); PublishLive(); SyncNotification(); RefreshChips(); RefreshTimer();
 	}
 
 	void Commit()
@@ -816,21 +822,68 @@ public class MainPage : ContentPage
 		if (!Active) return;
 		Buzz();
 		int s = (int)Elapsed;
-		if (s >= 5) data.Sessions.Add(new Session { CourseId = runCourseId!, Start = runStart, Seconds = s });
+		if (s >= 5) data.Sessions.Add(new Session { Id = RunIdOrNew(), CourseId = runCourseId!, Start = runStart, Seconds = s });
+		var endedCourse = runCourseId!;
 		runCourseId = null; runningSince = null; accumulated = 0;
+		data.SetLive(false, RunIdOrNew(), endedCourse, runStart, 0, null);
 		PersistTimer();
-		SyncNotification();
 		Changed();
+		sync.RequestLive();
+		SyncNotification();
 	}
 
 	void PersistTimer()
 	{
 		if (!Active) { Preferences.Remove("run"); return; }
-		Preferences.Set("run", RunString(runCourseId!, runStart, accumulated, runningSince));
+		Preferences.Set("run", RunString(runCourseId!, runStart, accumulated, runningSince, runId));
 	}
 
-	static string RunString(string courseId, DateTime start, double acc, DateTime? since) =>
-		$"{courseId}|{start.Ticks}|{acc.ToString(CultureInfo.InvariantCulture)}|{since?.Ticks ?? 0}";
+	static string RunString(string courseId, DateTime start, double acc, DateTime? since, string runId = "") =>
+		$"{courseId}|{start.Ticks}|{acc.ToString(CultureInfo.InvariantCulture)}|{since?.Ticks ?? 0}|{runId}";
+
+	// ---------- canlı seans: cihazlar arası paylaşım ----------
+	string RunIdOrNew() { if (runId.Length == 0) runId = Guid.NewGuid().ToString("N"); return runId; }
+
+	/// <summary>Yerel zamanlayıcı durumunu paylaşılan canlı duruma yazıp hemen gönderir.</summary>
+	void PublishLive()
+	{
+		data.SetLive(Active, RunIdOrNew(), runCourseId ?? "", runStart, accumulated, runningSince);
+		Store.Save(data);
+		sync.RequestLive();
+	}
+
+	// UI thread: başka cihazın canlı seansı geldi. Uygulandıysa true.
+	bool OnRemoteLive(LiveState r)
+	{
+		if (r.Active)
+		{
+			if (!data.Courses.Any(c => c.Id == r.CourseId)) return false; // ders henüz gelmedi; sonra denenir
+			if (Active && runId != r.RunId)
+			{
+				// Bu cihazdaki ayrı seansın emeği kaybolmasın: kaydet, sonra paylaşılana geç.
+				int s = (int)Elapsed;
+				if (s >= 5) data.Sessions.Add(new Session { Id = RunIdOrNew(), CourseId = runCourseId!, Start = runStart, Seconds = s });
+				Store.Save(data); sync.MarkDirty();
+			}
+			runCourseId = r.CourseId; runId = r.RunId; runStart = r.Start; accumulated = r.Accumulated; runningSince = r.RunningSince;
+			pickedCourseId = r.CourseId;
+		}
+		else if (Active && runId != r.RunId)
+		{
+			// Uzaktaki bitiş başka bir seansa ait; bizimki sürüyor. Durumumuzu yenileyip tekrar yayınlarız.
+			data.SetLive(true, runId, runCourseId!, runStart, accumulated, runningSince);
+			Store.Save(data);
+			return false;
+		}
+		else
+		{
+			runCourseId = null; runningSince = null; accumulated = 0; runId = r.RunId;
+		}
+		data.Live = r;
+		Store.Save(data);
+		PersistTimer(); SyncNotification(); RefreshAll();
+		return true;
+	}
 
 	// ---------- bildirim (çalışırken) ----------
 	public static MainPage? Current;
@@ -840,6 +893,7 @@ public class MainPage : ContentPage
 #if ANDROID
 		if (!Active) TimerNotifier.Cancel();
 		else TimerNotifier.Show(CurrentCourse?.Name ?? "", Running, Elapsed);
+		TimerWidget.Refresh();
 #endif
 	}
 
@@ -864,28 +918,50 @@ public class MainPage : ContentPage
 	/// <summary>Bildirimdeki düğmeler (uygulama süreci kapalıyken): kayıtlı zamanlayıcıyı doğrudan günceller.</summary>
 	public static void Headless(bool finish)
 	{
+		HeadlessCore(finish);
+		TimerWidget.Refresh();
+	}
+
+	static void HeadlessCore(bool finish)
+	{
 		try
 		{
 			Store.Dir = FileSystem.AppDataDirectory;
 			var p = Preferences.Get("run", "").Split('|');
-			if (p.Length != 4) { TimerNotifier.Cancel(); return; }
+			if (p.Length < 4)
+			{
+				// Çalışan seans yok: widget'taki oynat düğmesi son seçilen dersle yeni seans başlatır.
+				if (finish) { TimerNotifier.Cancel(); return; }
+				var d0 = Store.Load();
+				var c0 = d0.Courses.FirstOrDefault(c => c.Id == Preferences.Get("lastCourse", "")) ?? d0.Courses.FirstOrDefault();
+				if (c0 == null) return;
+				var rid = Guid.NewGuid().ToString("N"); var st = DateTime.Now; var sn = DateTime.UtcNow;
+				Preferences.Set("run", RunString(c0.Id, st, 0, sn, rid));
+				d0.SetLive(true, rid, c0.Id, st, 0, sn); Store.Save(d0);
+				TimerNotifier.Show(c0.Name, true, 0);
+				return;
+			}
 			var data = Store.Load();
 			var course = data.Courses.FirstOrDefault(c => c.Id == p[0]);
 			if (course == null) { Preferences.Remove("run"); TimerNotifier.Cancel(); return; }
 			var start = new DateTime(long.Parse(p[1]));
 			var acc = double.Parse(p[2], CultureInfo.InvariantCulture);
+			var rid2 = p.Length > 4 ? p[4] : "";
+			if (rid2.Length == 0) rid2 = Guid.NewGuid().ToString("N");
 			var t = long.Parse(p[3]);
 			DateTime? since = t == 0 ? null : new DateTime(t, DateTimeKind.Utc);
 			double el = acc + (since is { } r ? (DateTime.UtcNow - r).TotalSeconds : 0);
 			if (finish)
 			{
-				if (el >= 5) { data.Sessions.Add(new Session { CourseId = course.Id, Start = start, Seconds = (int)el }); Store.Save(data); }
+				if (el >= 5) { data.Sessions.Add(new Session { Id = rid2, CourseId = course.Id, Start = start, Seconds = (int)el }); }
+				data.SetLive(false, rid2, course.Id, start, 0, null); Store.Save(data);
 				Preferences.Remove("run");
 				TimerNotifier.Cancel();
 				return;
 			}
 			if (since != null) { acc = el; since = null; } else since = DateTime.UtcNow;
-			Preferences.Set("run", RunString(course.Id, start, acc, since));
+			Preferences.Set("run", RunString(course.Id, start, acc, since, rid2));
+			data.SetLive(true, rid2, course.Id, start, acc, since); Store.Save(data);
 			TimerNotifier.Show(course.Name, since != null, el);
 		}
 		catch { }
@@ -896,8 +972,8 @@ public class MainPage : ContentPage
 		try
 		{
 			var p = Preferences.Get("run", "").Split('|');
-			if (p.Length != 4 || !data.Courses.Any(c => c.Id == p[0])) { Preferences.Remove("run"); return; }
-			runCourseId = p[0]; runStart = new DateTime(long.Parse(p[1])); accumulated = double.Parse(p[2], CultureInfo.InvariantCulture);
+			if (p.Length < 4 || !data.Courses.Any(c => c.Id == p[0])) { Preferences.Remove("run"); return; }
+			runId = p.Length > 4 ? p[4] : ""; runCourseId = p[0]; runStart = new DateTime(long.Parse(p[1])); accumulated = double.Parse(p[2], CultureInfo.InvariantCulture);
 			var t = long.Parse(p[3]); runningSince = t == 0 ? null : new DateTime(t, DateTimeKind.Utc);
 		}
 		catch { runCourseId = null; runningSince = null; accumulated = 0; }
