@@ -189,6 +189,7 @@ public sealed class SyncService
             if (rows.items.Count > 0) { changed |= await OnUi(() => ApplyCourses(rows.items)); cfg.PullCoursesAt = rows.last; }
             var srows = await PullAsync("sessions", cfg.PullSessionsAt);
             if (srows.items.Count > 0) { changed |= await OnUi(() => ApplySessions(srows.items)); cfg.PullSessionsAt = srows.last; }
+            changed |= await OnUi(MergeDuplicateCourses); // aynı adlı dersleri tek derse indir
             if (changed) await OnUi(onDataChanged);
 
             // 2) gönder (yerelde değişenler)
@@ -297,6 +298,11 @@ public sealed class SyncService
             {
                 if (local != null && !courseInUse(id))
                 {
+                    // Başka cihaz bunu aynı adlı derse birleştirdiyse yerel seanslar kaybolmasın, taşınsın.
+                    var twin = data.Courses.FirstOrDefault(c => c.Id != id && SameName(c, local));
+                    if (twin != null)
+                        foreach (var s in data.Sessions.Where(s => s.CourseId == id))
+                        { s.CourseId = twin.Id; s.UpdatedAt = DateTime.UtcNow; }
                     data.Sessions.RemoveAll(s => s.CourseId == id);
                     data.Courses.Remove(local);
                     changed = true;
@@ -313,6 +319,34 @@ public sealed class SyncService
                 changed = true;
             }
         }
+        return changed;
+    }
+
+    static bool SameName(Course a, Course b) =>
+        string.Equals(a.Name.Trim(), b.Name.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// İki cihazda aynı adla ayrı eklenen dersleri birleştirir. Kazanan deterministik (en küçük Id),
+    /// böylece iki cihaz da aynı sonuca varır. Kaybedenin seansları kazanana taşınır, kaybeden silinir.
+    /// Çalışan seansın kullandığı ders şimdilik atlanır; seans bitince sonraki senkronda birleşir.
+    /// </summary>
+    bool MergeDuplicateCourses()
+    {
+        bool changed = false;
+        foreach (var group in data.Courses.Where(c => c.Name.Trim().Length > 0)
+                     .GroupBy(c => c.Name.Trim(), StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).ToList())
+        {
+            var winner = group.OrderBy(c => c.Id, StringComparer.Ordinal).First();
+            foreach (var loser in group.Where(c => c != winner).ToList())
+            {
+                if (courseInUse(loser.Id)) continue;
+                foreach (var s in data.Sessions.Where(s => s.CourseId == loser.Id))
+                { s.CourseId = winner.Id; s.UpdatedAt = DateTime.UtcNow; }
+                data.DeleteCourse(loser); // seansları zaten taşındı; ders için silme izi bırakır
+                changed = true;
+            }
+        }
+        if (changed) Store.Save(data);
         return changed;
     }
 
