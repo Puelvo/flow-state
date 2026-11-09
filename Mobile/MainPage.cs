@@ -123,7 +123,7 @@ public class MainPage : ContentPage
 		BuildBackground();
 		views[0] = BuildTimerView();
 		views[1] = Scroll(new VerticalStackLayout { Padding = new Thickness(20, 8, 20, 24), Children = { Lbl("İstatistikler", 26, true), statsBox } });
-		views[2] = Scroll(new VerticalStackLayout { Padding = new Thickness(20, 8, 20, 24), Children = { Lbl("Geçmiş", 26, true), new Grid { HeightRequest = 8 }, historyBox } });
+		views[2] = Scroll(new VerticalStackLayout { Padding = new Thickness(20, 8, 20, 24), Children = { Lbl("Geçmiş", 26, true), BuildHistoryTools(), historyBox } });
 		views[3] = BuildSettingsView();
 		foreach (var v in views) { v.IsVisible = false; body.Children.Add(v); }
 
@@ -310,6 +310,7 @@ public class MainPage : ContentPage
 		var course = CurrentCourse;
 		ringCourse.Text = course?.Name ?? "Bir ders ekle";
 		ringStatus.Text = !Active ? (course == null ? "" : "Başlamaya hazır") : !Running ? "Duraklatıldı" : "Odaklanıyorsun";
+		UpdateKeepOn();
 		startIcon.Kind = Active && Running ? 1 : 0;
 		startGv.Invalidate();
 		startBtn.Opacity = course == null ? 0.35 : 1;
@@ -479,6 +480,56 @@ public class MainPage : ContentPage
 		}
 	}
 
+	// ---------- geçmiş araçları ----------
+	View BuildHistoryTools()
+	{
+		var add = Pill("＋ Elle kayıt", true); var exp = Pill("CSV dışa aktar", false);
+		Tap(add, AddManual); Tap(exp, ExportCsv);
+		add.Margin = new Thickness(0, 0, 8, 0);
+		return new HorizontalStackLayout { Margin = new Thickness(0, 10, 0, 12), Children = { add, exp } };
+	}
+
+	async void AddManual()
+	{
+		if (data.Courses.Count == 0) { await DisplayAlert("Kayıt", "Önce Ayarlar'dan bir ders ekle.", "Tamam"); return; }
+		var names = data.Courses.Select(c => c.Name).ToArray();
+		var pick = names.Length == 1 ? names[0] : await DisplayActionSheet("Hangi ders?", "Vazgeç", null, names);
+		var course = data.Courses.FirstOrDefault(c => c.Name == pick);
+		if (course == null) return;
+		var txt = await DisplayPromptAsync("Elle kayıt", $"{course.Name} için kaç dakika çalıştın?", "Ekle", "Vazgeç", "örn. 45", 4, Keyboard.Numeric);
+		if (!int.TryParse(txt, out var min) || min < 1 || min > 1440) return;
+		data.Sessions.Add(new Session { CourseId = course.Id, Start = DateTime.Now.AddMinutes(-min), Seconds = min * 60 });
+		Changed();
+	}
+
+	async void ExportCsv()
+	{
+		try
+		{
+			var inv = CultureInfo.InvariantCulture;
+			var sb = new System.Text.StringBuilder("Tarih;Başlangıç;Ders;Süre (dk)\r\n");
+			foreach (var s in data.Sessions.OrderBy(x => x.Start))
+			{
+				var name = (data.Courses.FirstOrDefault(c => c.Id == s.CourseId)?.Name ?? "").Replace(';', ',');
+				sb.Append(s.Start.ToString("yyyy-MM-dd", inv)).Append(';').Append(s.Start.ToString("HH:mm", inv)).Append(';')
+				  .Append(name).Append(';').Append(Math.Round(s.Seconds / 60.0, 1).ToString(Tr)).Append("\r\n");
+			}
+			var path = System.IO.Path.Combine(FileSystem.CacheDirectory, $"calisma-kayitlari-{DateTime.Today:yyyy-MM-dd}.csv");
+			await File.WriteAllTextAsync(path, sb.ToString(), new System.Text.UTF8Encoding(true));
+			await Share.Default.RequestAsync(new ShareFileRequest("Çalışma kayıtları", new ShareFile(path)));
+		}
+		catch (Exception ex) { await DisplayAlert("Dışa aktarılamadı", ex.Message, "Tamam"); }
+	}
+
+	bool keepOnApplied;
+	void UpdateKeepOn()
+	{
+		bool want = Preferences.Get("keepOn", false) && Active && Running;
+		if (want == keepOnApplied) return;
+		keepOnApplied = want;
+		try { DeviceDisplay.Current.KeepScreenOn = want; } catch { }
+	}
+
 	// ---------- ayarlar ----------
 	View BuildSettingsView()
 	{
@@ -491,6 +542,12 @@ public class MainPage : ContentPage
 		goalEntry.Completed += (_, _) => ApplyGoal(); goalEntry.Unfocused += (_, _) => ApplyGoal();
 		var goalRow = new HorizontalStackLayout { Spacing = 10, Children = { Lbl("Günlük hedef:", 14, false, Muted), goalEntry, Lbl("saat", 14, false, Muted) } };
 		((View)goalRow.Children[0]).VerticalOptions = ((View)goalRow.Children[2]).VerticalOptions = LayoutOptions.Center;
+
+		var keepSwitch = new Switch { IsToggled = Preferences.Get("keepOn", false), OnColor = accent, VerticalOptions = LayoutOptions.Center };
+		keepSwitch.Toggled += (_, e) => { Preferences.Set("keepOn", e.Value); UpdateKeepOn(); };
+		var keepRow = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 12 };
+		keepRow.Add(new VerticalStackLayout { Spacing = 2, Children = { Lbl("Ekranı açık tut", 15, true), Lbl("Zamanlayıcı çalışırken ekran kapanmasın.", 12, false, Muted) } }, 0, 0);
+		keepRow.Add(keepSwitch, 1, 0);
 
 		var courseName = Field("Yeni ders adı"); courseName.MaxLength = 40;
 		var addBtn = Pill("Ders ekle", true);
@@ -521,6 +578,7 @@ public class MainPage : ContentPage
 				Head("DERSLER"),
 				Card(new VerticalStackLayout { Spacing = 10, Children = { courseName, addBtn, courseBox } }, 16),
 				Head("HEDEF"), Card(goalRow, 16),
+				Head("ÇALIŞIRKEN"), Card(keepRow, 16),
 				Head("SENKRONİZASYON"),
 				Card(new VerticalStackLayout { Spacing = 10, Children = { Lbl("Telefon ve bilgisayardaki çalışmalar aynı hesapta birleşir. Veriler önce bu cihazda tutulur; internet yokken de çalışır.", 13, false, Muted), accountBox } }, 18),
 				Head("SÜRELERİ SIFIRLA"),
