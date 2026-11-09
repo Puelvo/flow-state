@@ -51,7 +51,6 @@ public partial class MainWindow : Window
         string[] titles = { "Bugün", "Bu hafta", "Bu ay", "Toplam" };
         statCards = BuildCards(StatsCards, titles);
         streakCards = BuildCards(StreakCards, new[] { "Güncel seri", "En uzun seri", "Çalışılan gün" });
-        GoalBox.Text = data.DailyGoalHours.ToString("0.##", Tr);
 
         BuildStars();
         ApplyTheme();
@@ -603,13 +602,7 @@ public partial class MainWindow : Window
     {
         var per = PerDay();
         double today = per.GetValueOrDefault(Today);
-        double goal = Math.Max(0.1, data.DailyGoalHours) * 3600;
-        double pct = Math.Min(100, today / goal * 100);
-        GoalCol1.Width = new GridLength(pct, GridUnitType.Star);
-        GoalCol2.Width = new GridLength(100 - pct, GridUnitType.Star);
-        GoalText.Text = $"Bugün {Fmt(today)} / {data.DailyGoalHours.ToString("0.##", Tr)} sa" + (pct >= 100 ? "  ✓ hedef tamam" : "");
         int streak = Streak(per);
-        StreakText.Text = $"🔥 {streak} günlük seri";
         streakCards[0].Text = $"🔥 {streak} gün";
         streakCards[1].Text = $"{Math.Max(streak, StatsMath.LongestStreak(per))} gün";
         streakCards[2].Text = $"{StatsMath.ActiveDays(per)} gün";
@@ -631,7 +624,7 @@ public partial class MainWindow : Window
         const int weeks = 18;
         HeatGrid.Children.Clear();
         var acc = WidgetColor();
-        double goalSec = Math.Max(0.1, data.DailyGoalHours) * 3600;
+        const double goalSec = 2 * 3600; // yoğunluk referansı
         var start = StatsMath.Monday(Today).AddDays(-7 * (weeks - 1));
         for (int row = 0; row < 7; row++)
             for (int col = 0; col < weeks; col++)
@@ -850,25 +843,6 @@ public partial class MainWindow : Window
     }
 
     // ---------- hedef, dışa aktarma, klavye ----------
-
-    void GoalBox_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter) { ApplyGoal(); Keyboard.ClearFocus(); }
-    }
-
-    void GoalBox_LostFocus(object sender, RoutedEventArgs e) => ApplyGoal();
-
-    void ApplyGoal()
-    {
-        if (double.TryParse(GoalBox.Text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var g)
-            && g > 0 && g <= 24)
-        {
-            data.DailyGoalHours = g;
-            Save();
-        }
-        GoalBox.Text = data.DailyGoalHours.ToString("0.##", Tr);
-        UpdateAll();
-    }
 
     void Export_Click(object sender, RoutedEventArgs e)
     {

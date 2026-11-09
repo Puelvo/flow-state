@@ -55,7 +55,7 @@ public class MainPage : ContentPage
 	readonly VerticalStackLayout statsBox = new() { Spacing = 10 }, historyBox = new() { Spacing = 8 },
 		courseBox = new() { Spacing = 8 }, accountBox = new() { Spacing = 10 };
 	readonly FlexLayout swatchRow = new() { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
-	Entry hexEntry = null!, goalEntry = null!;
+	Entry hexEntry = null!;
 
 	// ---------- yardımcılar ----------
 	static Label Lbl(string t, double size, bool bold = false, Color? c = null) => new()
@@ -387,23 +387,6 @@ public class MainPage : ContentPage
 			grid.Add(Card(new VerticalStackLayout { Spacing = 6, Children = { Lbl(items[i].Item1, 13, false, Muted), Lbl(Fmt(items[i].Item2), 21, true) } }), i % 2, i / 2);
 		statsBox.Children.Add(grid);
 
-		// hedef
-		statsBox.Children.Add(Head("BUGÜNKÜ HEDEF"));
-		double goal = Math.Max(0.1, data.DailyGoalHours) * 3600, pct = Math.Min(100, todaySec / goal * 100);
-		var bar = new Grid { HeightRequest = 10, Margin = new Thickness(0, 12, 0, 0) };
-		bar.Add(new Border { BackgroundColor = Panel2, StrokeThickness = 0, StrokeShape = new RoundRectangle { CornerRadius = 5 } });
-		var fill = new Grid { ColumnDefinitions = { new(new GridLength(Math.Max(pct, 0.001), GridUnitType.Star)), new(new GridLength(Math.Max(100 - pct, 0.001), GridUnitType.Star)) } };
-		fill.Add(new Border { BackgroundColor = accent, StrokeThickness = 0, StrokeShape = new RoundRectangle { CornerRadius = 5 } }, 0, 0);
-		bar.Add(fill);
-		statsBox.Children.Add(Card(new VerticalStackLayout
-		{
-			Children =
-			{
-				Lbl($"Bugün {Fmt(todaySec)} / {data.DailyGoalHours.ToString("0.##", Tr)} sa" + (pct >= 100 ? "  ✓ hedef tamam" : ""), 14),
-				Lbl($"🔥 {Streak(per)} günlük seri", 13, false, Muted), bar
-			}
-		}, 18));
-
 		// seri
 		statsBox.Children.Add(Head("SERİ"));
 		int streak = Streak(per);
@@ -468,7 +451,7 @@ public class MainPage : ContentPage
 		// ısı haritası: sütun = hafta, satır = Pzt..Paz
 		statsBox.Children.Add(Head("SON 18 HAFTA · ISI HARİTASI"));
 		const int weeks = 18;
-		double goalSec = Math.Max(0.1, data.DailyGoalHours) * 3600;
+		const double goalSec = 2 * 3600; // ısı haritası yoğunluk referansı
 		var heat = new Grid { RowSpacing = 3, ColumnSpacing = 3 };
 		for (int r = 0; r < 7; r++) heat.RowDefinitions.Add(new RowDefinition(new GridLength(15)));
 		for (int c = 0; c < weeks; c++) heat.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -627,11 +610,6 @@ public class MainPage : ContentPage
 		var hexRow = new HorizontalStackLayout { Spacing = 10, Children = { Lbl("Özel renk:", 14, false, Muted), hexEntry } };
 		((View)hexRow.Children[0]).VerticalOptions = LayoutOptions.Center;
 
-		goalEntry = Field("2", false, Keyboard.Numeric); goalEntry.WidthRequest = 90; goalEntry.HorizontalTextAlignment = TextAlignment.Center;
-		goalEntry.Completed += (_, _) => ApplyGoal(); goalEntry.Unfocused += (_, _) => ApplyGoal();
-		var goalRow = new HorizontalStackLayout { Spacing = 10, Children = { Lbl("Günlük hedef:", 14, false, Muted), goalEntry, Lbl("saat", 14, false, Muted) } };
-		((View)goalRow.Children[0]).VerticalOptions = ((View)goalRow.Children[2]).VerticalOptions = LayoutOptions.Center;
-
 		var keepSwitch = new Switch { IsToggled = Preferences.Get("keepOn", false), OnColor = accent, VerticalOptions = LayoutOptions.Center };
 		keepSwitch.Toggled += (_, e) => { Preferences.Set("keepOn", e.Value); UpdateKeepOn(); };
 		var keepRow = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 12 };
@@ -666,7 +644,6 @@ public class MainPage : ContentPage
 				Card(new VerticalStackLayout { Spacing = 12, Children = { Lbl("Halka, düğmeler, seçili öğeler ve arka plan ışığı bu rengi kullanır.", 13, false, Muted), swatchRow, hexRow } }, 18),
 				Head("DERSLER"),
 				Card(new VerticalStackLayout { Spacing = 10, Children = { courseName, addBtn, courseBox } }, 16),
-				Head("HEDEF"), Card(goalRow, 16),
 				Head("ÇALIŞIRKEN"), Card(keepRow, 16),
 				Head("SENKRONİZASYON"),
 				Card(new VerticalStackLayout { Spacing = 10, Children = { Lbl("Telefon ve bilgisayardaki çalışmalar aynı hesapta birleşir. Veriler önce bu cihazda tutulur; internet yokken de çalışır.", 13, false, Muted), accountBox } }, 18),
@@ -693,7 +670,6 @@ public class MainPage : ContentPage
 			Tap(dot, () => SetColor(h)); swatchRow.Children.Add(dot);
 		}
 		if (!hexEntry.IsFocused) hexEntry.Text = data.WidgetColor.ToUpperInvariant();
-		if (!goalEntry.IsFocused) goalEntry.Text = data.DailyGoalHours.ToString("0.##", Tr);
 
 		courseBox.Children.Clear();
 		foreach (var c in data.Courses.ToList())
@@ -723,14 +699,6 @@ public class MainPage : ContentPage
 		if (!t.StartsWith('#')) t = "#" + t;
 		if (t.Length == 7 && t[1..].All(Uri.IsHexDigit)) SetColor(t);
 		else hexEntry.Text = data.WidgetColor.ToUpperInvariant();
-	}
-
-	void ApplyGoal()
-	{
-		if (double.TryParse((goalEntry.Text ?? "").Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var g) && g > 0 && g <= 24
-			&& Math.Abs(g - data.DailyGoalHours) > 0.001)
-		{ data.DailyGoalHours = g; Store.Save(data); sync.MarkDirty(); }
-		goalEntry.Text = data.DailyGoalHours.ToString("0.##", Tr);
 	}
 
 	async void ResetPeriod(string key, string title)

@@ -85,7 +85,6 @@ public static class TimerWidget
 
 			double todaySec = data.Sessions.Where(s => s.Start >= DateTime.Today).Sum(s => (double)s.Seconds);
 			if (active && new DateTime(long.Parse(p[1])) >= DateTime.Today) todaySec += elapsed;
-			double goalSec = Math.Max(0.1, data.DailyGoalHours) * 3600;
 
 			AG.Color accent;
 			try { accent = AG.Color.ParseColor(data.WidgetColor); } catch { accent = AG.Color.ParseColor("#5B8CFF"); }
@@ -96,7 +95,7 @@ public static class TimerWidget
 			v.SetChronometer(Id("w_time"), baseMs, null, running);
 			v.SetTextViewText(Id("w_course"), course?.Name ?? "Ders ekle");
 			v.SetTextViewText(Id("w_status"), !active ? "Başlamaya hazır" : running ? "Odaklanıyorsun" : "Duraklatıldı");
-			v.SetTextViewText(Id("w_today"), $"Bugün {Fmt(todaySec)} · %{Math.Min(999, (int)(todaySec / goalSec * 100))}");
+			v.SetTextViewText(Id("w_today"), $"Bugün {Fmt(todaySec)}");
 
 			v.SetImageViewBitmap(Id("w_toggle"), ButtonBitmap(active && running ? 1 : 0, accent));
 			v.SetImageViewBitmap(Id("w_stop"), ButtonBitmap(2, accent));
@@ -176,7 +175,7 @@ public static class TimerWidget
 		if (kind == 0)
 		{
 			var path = new AG.Path();
-			path.MoveTo(size * 0.40f, size * 0.30f); path.LineTo(size * 0.72f, size * 0.50f); path.LineTo(size * 0.40f, size * 0.70f); path.Close();
+			path.MoveTo(size * 0.39f, size * 0.30f); path.LineTo(size * 0.71f, size * 0.50f); path.LineTo(size * 0.39f, size * 0.70f); path.Close();
 			paint.StrokeJoin = AG.Paint.Join.Round;
 			c.DrawPath(path, paint);
 		}
