@@ -964,7 +964,7 @@ public partial class MainWindow : Window
         UpdateAll();
     }
 
-    bool widgetOnTop = true;
+    bool widgetOnTop = false; // varsayılan: widget diğer pencerelerin altında kalır (📌 ile üste sabitlenir)
 
     static readonly string[] SwatchColors =
         { "#5B8CFF", "#FF5A6A", "#3DDC97", "#A78BFA", "#FFB04D", "#FF6FB5", "#2DD4D4", "#E5E7EB" };

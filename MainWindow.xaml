@@ -299,7 +299,7 @@
         <StackPanel x:Name="WidgetBar" Grid.RowSpan="2" Orientation="Horizontal"
                     HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,6,0" Visibility="Collapsed">
             <Button x:Name="PinBtn" Content="📌" Style="{StaticResource Btn}" Padding="9,3" FontSize="13" Background="Transparent"
-                    Foreground="{StaticResource Muted}" ToolTip="Her zaman üstte: açık" Click="WidgetPin_Click"/>
+                    Foreground="{StaticResource Muted}" ToolTip="Her zaman üstte: kapalı" Click="WidgetPin_Click"/>
             <Button Content="⤢" Style="{StaticResource Btn}" Padding="9,3" FontSize="13" Background="Transparent"
                     Foreground="{StaticResource Muted}" ToolTip="Tam görünüme dön (Esc)" Click="WidgetToggle_Click"/>
             <Button Content="✕" Style="{StaticResource Btn}" Padding="9,3" FontSize="13" Background="Transparent"
