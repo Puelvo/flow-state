@@ -43,6 +43,7 @@ public class AppData
     public List<Course> Courses { get; set; } = new();
     public List<Session> Sessions { get; set; } = new();
     public List<Tombstone> Tombstones { get; set; } = new();
+    public List<OwnedAnimal> OwnedAnimals { get; set; } = new(); // hayvanat bahçesi satın alımları
 
     public void DeleteSession(Session s)
     {

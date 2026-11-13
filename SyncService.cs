@@ -15,6 +15,7 @@ public class SyncConfig
     public string RefreshTokenProtected { get; set; } = ""; // DPAPI ile şifreli, base64
     public string PullCoursesAt { get; set; } = "1970-01-01T00:00:00+00:00"; // sunucunun synced_at değeri
     public string PullSessionsAt { get; set; } = "1970-01-01T00:00:00+00:00";
+    public string PullAnimalsAt { get; set; } = "1970-01-01T00:00:00+00:00";
     public DateTime LastPushedUtc { get; set; } = DateTime.MinValue;
 }
 
@@ -202,14 +203,18 @@ public sealed class SyncService
             if (rows.items.Count > 0) { changed |= await OnUi(() => ApplyCourses(rows.items)); cfg.PullCoursesAt = rows.last; }
             var srows = await PullAsync("sessions", cfg.PullSessionsAt);
             if (srows.items.Count > 0) { changed |= await OnUi(() => ApplySessions(srows.items)); cfg.PullSessionsAt = srows.last; }
+            var arows = await PullAsync("owned_animals", cfg.PullAnimalsAt);
+            if (arows.items.Count > 0) { changed |= await OnUi(() => ApplyAnimals(arows.items)); cfg.PullAnimalsAt = arows.last; }
             changed |= await OnUi(MergeDuplicateCourses); // aynı adlı dersleri tek derse indir
             if (changed) await OnUi(onDataChanged);
 
             // 2) gönder (yerelde değişenler)
             var startedUtc = DateTime.UtcNow;
             var (courses, sessions, tombC, tombS) = await OnUi(() => Snapshot(cfg.LastPushedUtc));
+            var animals = await OnUi(() => SnapshotAnimals(cfg.LastPushedUtc));
             await PushUpsertAsync("courses", courses);
             await PushUpsertAsync("sessions", sessions);
+            await PushUpsertAsync("owned_animals", animals, "user_id,animal_id");
             await PushDeletesAsync("courses", tombC);
             await PushDeletesAsync("sessions", tombS);
             cfg.LastPushedUtc = startedUtc;
@@ -242,6 +247,43 @@ public sealed class SyncService
         return (c, s, tc, ts);
     }
 
+    List<JsonObject> SnapshotAnimals(DateTime since) =>
+        data.OwnedAnimals.Where(x => U(x.UpdatedAt) > since).Select(x => new JsonObject
+        {
+            ["user_id"] = cfg.UserId, ["animal_id"] = x.AnimalId, ["price"] = x.Price,
+            ["bought_at"] = Iso(x.BoughtAt), ["updated_at"] = Iso(x.UpdatedAt), ["deleted"] = false
+        }).ToList();
+
+    /// <summary>
+    /// Satın alımlar kalıcıdır: uzakta olup yerelde olmayan eklenir. Aynı hayvan iki cihazda ayrı
+    /// alındıysa önce alınan (fiyatıyla) kalır; böylece her cihaz aynı bakiyeyi hesaplar.
+    /// </summary>
+    bool ApplyAnimals(List<JsonObject> rows)
+    {
+        bool changed = false;
+        foreach (var r in rows)
+        {
+            if (r["deleted"]!.GetValue<bool>()) continue;
+            var id = r["animal_id"]!.ToString();
+            var bought = ParseUtc(r["bought_at"]!.ToString());
+            int price = r["price"]!.GetValue<int>();
+            var local = data.OwnedAnimals.FirstOrDefault(o => o.AnimalId == id);
+            if (local == null)
+            {
+                data.OwnedAnimals.Add(new OwnedAnimal { AnimalId = id, Price = price, BoughtAt = bought, UpdatedAt = ParseUtc(r["updated_at"]!.ToString()) });
+                changed = true;
+            }
+            else if (bought < U(local.BoughtAt))
+            {
+                local.Price = price; local.BoughtAt = bought; local.UpdatedAt = DateTime.UtcNow;
+                changed = true;
+            }
+            else if (U(local.BoughtAt) < bought)
+                local.UpdatedAt = DateTime.UtcNow; // yerel daha önce alınmış: buluttakini düzeltmek için yeniden gönder
+        }
+        return changed;
+    }
+
     async Task<(List<JsonObject> items, string last)> PullAsync(string table, string since)
     {
         var all = new List<JsonObject>();
@@ -257,12 +299,12 @@ public sealed class SyncService
         return (all, last);
     }
 
-    async Task PushUpsertAsync(string table, List<JsonObject> items)
+    async Task PushUpsertAsync(string table, List<JsonObject> items, string conflict = "user_id,id")
     {
         for (int i = 0; i < items.Count; i += 500)
         {
             var chunk = new JsonArray(items.Skip(i).Take(500).Select(x => (JsonNode)JsonNode.Parse(x.ToJsonString())!).ToArray());
-            await SendAsync(HttpMethod.Post, $"{BaseUrl}/rest/v1/{table}?on_conflict=user_id,id", chunk.ToJsonString(),
+            await SendAsync(HttpMethod.Post, $"{BaseUrl}/rest/v1/{table}?on_conflict={conflict}", chunk.ToJsonString(),
                 "resolution=merge-duplicates,return=minimal");
         }
     }
