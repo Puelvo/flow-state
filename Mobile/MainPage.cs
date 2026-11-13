@@ -557,23 +557,10 @@ public partial class MainPage : ContentPage
 	// ---------- geçmiş araçları ----------
 	View BuildHistoryTools()
 	{
-		var add = Pill("＋ Elle kayıt", true); var exp = Pill("CSV dışa aktar", false);
-		Tap(add, AddManual); Tap(exp, ExportCsv);
-		add.Margin = new Thickness(0, 0, 8, 0);
-		return new HorizontalStackLayout { Margin = new Thickness(0, 10, 0, 12), Children = { add, exp } };
-	}
-
-	async void AddManual()
-	{
-		if (data.Courses.Count == 0) { await DisplayAlert("Kayıt", "Önce Ayarlar'dan bir ders ekle.", "Tamam"); return; }
-		var names = data.Courses.Select(c => c.Name).ToArray();
-		var pick = names.Length == 1 ? names[0] : await DisplayActionSheet("Hangi ders?", "Vazgeç", null, names);
-		var course = data.Courses.FirstOrDefault(c => c.Name == pick);
-		if (course == null) return;
-		var txt = await DisplayPromptAsync("Elle kayıt", $"{course.Name} için kaç dakika çalıştın?", "Ekle", "Vazgeç", "örn. 45", 4, Keyboard.Numeric);
-		if (!int.TryParse(txt, out var min) || min < 1 || min > 1440) return;
-		data.Sessions.Add(new Session { CourseId = course.Id, Start = DateTime.Now.AddMinutes(-min), Seconds = min * 60 });
-		Changed();
+		// Elle kayıt bilinçli olarak yok: jetonlar yalnızca kronometreyle yapılan seanslardan gelir.
+		var exp = Pill("CSV dışa aktar", false);
+		Tap(exp, ExportCsv);
+		return new HorizontalStackLayout { Margin = new Thickness(0, 10, 0, 12), Children = { exp } };
 	}
 
 	async void ExportCsv()

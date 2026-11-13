@@ -97,6 +97,7 @@
                     <RadioButton x:Name="NavTimer" GroupName="nav" Style="{StaticResource Nav}" Content="Çalış" IsChecked="True" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavStats" GroupName="nav" Style="{StaticResource Nav}" Content="İstatistik" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavHistory" GroupName="nav" Style="{StaticResource Nav}" Content="Geçmiş" Checked="Nav_Checked"/>
+                    <RadioButton x:Name="NavZoo" GroupName="nav" Style="{StaticResource Nav}" Content="Bahçe" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavSocial" GroupName="nav" Style="{StaticResource Nav}" Content="Sosyal" Checked="Nav_Checked"/>
                     <RadioButton x:Name="NavSettings" GroupName="nav" Style="{StaticResource Nav}" Content="Ayarlar" Checked="Nav_Checked"/>
                 </StackPanel>
@@ -223,6 +224,11 @@
                 <StackPanel x:Name="HistoryPanel" MaxWidth="860"/>
             </ScrollViewer>
         </Grid>
+
+        <!-- Bahçe görünümü: hayvanat bahçesi ve market (içerik MainWindow.Zoo.cs içinde kurulur) -->
+        <ScrollViewer x:Name="ZooView" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="ZooRoot" Margin="40,20,40,36" MaxWidth="860"/>
+        </ScrollViewer>
 
         <!-- Sosyal görünümü: arkadaşlar ve odalar (içerik MainWindow.Social.cs içinde kurulur) -->
         <ScrollViewer x:Name="SocialView" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">

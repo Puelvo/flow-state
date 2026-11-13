@@ -44,16 +44,36 @@ public enum BuyResult { Ok, AlreadyOwned, NotEnough, Unknown }
 
 /// <summary>
 /// Jeton ekonomisi. Bakiye saklanmaz, her seferinde hesaplanır:
-/// kazanılan (tüm seansların toplam süresinden) − harcanan (satın alımların fiyatları).
-/// Böylece cihazlar arası sayaç çakışması olmaz.
+/// kazanılan (her seansın kendi jetonlarının toplamı) − harcanan (satın alımların fiyatları).
+/// Böylece cihazlar arası sayaç çakışması olmaz. Kural kullanıcıya hiçbir yerde gösterilmez.
 /// </summary>
 public static class Zoo
 {
-    public const int SecondsPerCoin = 360; // 6 dk = 1 jeton. Kullanıcıya hiçbir yerde gösterilmez.
+    // Bir seans (başlat → bitir; duraklatmalar seansı bölmez) için jeton:
+    //   taban = 10 · (dakika / 60)^1.25   → 1 sa ≈ 10; uzun kesintisiz seans orantısından fazla kazandırır
+    //                                       (30 dk ≈ 4, 2 sa ≈ 24, 3 sa ≈ 39)
+    //   şans  = taban · [0, %40)           → 1 sa: 10–14 arası
+    // Şans seansın kimliğinden türetilir: aynı seans her hesapta, her cihazda aynı jetonu verir.
+    const double HourCoins = 10, Exponent = 1.25, MaxLuck = 0.40;
 
-    /// <param name="liveSeconds">Sürmekte olan seansın geçen süresi; jeton çalışırken canlı artsın diye.</param>
+    static double BaseCoins(double seconds)
+        => seconds <= 0 ? 0 : HourCoins * Math.Pow(seconds / 3600.0, Exponent);
+
+    /// <summary>Kimliğe bağlı, kalıcı [0,1) sayı. string.GetHashCode süreçten sürece değiştiği için FNV-1a.</summary>
+    static double Luck(string id)
+    {
+        uint h = 2166136261;
+        foreach (char c in id) { h ^= c; h *= 16777619; }
+        return (h % 10000) / 10000.0;
+    }
+
+    public static int SessionCoins(Session s)
+        => (int)(BaseCoins(s.Seconds) * (1 + MaxLuck * Luck(s.Id)));
+
+    /// <param name="liveSeconds">Sürmekte olan seansın geçen süresi. Canlıyken yalnız taban sayılır;
+    /// şans payı seans bitince eklenir (sürpriz). Böylece canlı bakiye bitişteki değeri hiç aşmaz.</param>
     public static int Earned(AppData d, double liveSeconds = 0)
-        => (int)((d.Sessions.Sum(s => (long)s.Seconds) + (long)Math.Max(0, liveSeconds)) / SecondsPerCoin);
+        => d.Sessions.Sum(SessionCoins) + (int)BaseCoins(Math.Max(0, liveSeconds));
 
     public static int Spent(AppData d) => d.OwnedAnimals.Sum(o => o.Price);
 

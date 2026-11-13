@@ -539,7 +539,9 @@ public partial class MainWindow : Window
 
     void Nav_Checked(object sender, RoutedEventArgs e)
     {
-        if (TimerView == null || StatsView == null || HistoryView == null || SettingsView == null || SocialView == null || !ready) return;
+        if (TimerView == null || StatsView == null || HistoryView == null || SettingsView == null || SocialView == null || ZooView == null || !ready) return;
+        if (NavZoo.IsChecked != true && ZooView.Visibility == Visibility.Visible) ResetZooScreen();
+        ZooView.Visibility = NavZoo.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         TimerView.Visibility = NavTimer.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         StatsView.Visibility = NavStats.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         HistoryView.Visibility = NavHistory.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
@@ -562,6 +564,7 @@ public partial class MainWindow : Window
         UpdateTimerView();
         if (StatsView.Visibility == Visibility.Visible) UpdateStats();
         if (HistoryView.Visibility == Visibility.Visible) UpdateHistory();
+        if (ZooView.Visibility == Visibility.Visible) UpdateZoo();
     }
 
     void UpdateTimerView()
