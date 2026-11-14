@@ -141,6 +141,9 @@
                                    TextAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="68"/>
                         <TextBlock x:Name="TimerStatus" Foreground="{StaticResource Muted}" FontSize="14"
                                    TextAlignment="Center" Margin="0,6,0,0"/>
+                        <!-- Gezgin: odaklanırken çemberin içinde yürür (MainWindow.Explorer.cs) -->
+                        <Image x:Name="RingWalker" Width="92" Height="92" Margin="0,8,0,0" HorizontalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False"/>
                     </StackPanel>
                 </Grid>
 

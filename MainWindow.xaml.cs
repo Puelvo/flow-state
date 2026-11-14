@@ -442,6 +442,7 @@ public partial class MainWindow : Window
     void Tick()
     {
         UpdateRing();
+        UpdateExplorer();
         int s = ActiveSeconds;
 
         if (s == lastTickSecond) return;

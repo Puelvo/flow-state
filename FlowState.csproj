@@ -14,15 +14,21 @@
 
   <!-- Android (MAUI) projesi Mobile klasöründe; Windows derlemesine karışmasın -->
   <ItemGroup>
-    <Compile Remove="Mobile\**" />
-    <Page Remove="Mobile\**" />
-    <EmbeddedResource Remove="Mobile\**" />
-    <None Remove="Mobile\**" />
+    <Compile Remove="Mobile/**;tools/**" />
+    <Page Remove="Mobile/**;tools/**" />
+    <EmbeddedResource Remove="Mobile/**;tools/**" />
+    <None Remove="Mobile/**;tools/**" />
   </ItemGroup>
 
 
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.0" />
+  </ItemGroup>
+
+  <!-- Sprite şeritleri: hayvanlar (tools/build-sprites.ps1) ve odak çemberindeki gezgin (tools/build-explorer.ps1) -->
+  <ItemGroup>
+    <Resource Include="Assets\pixellab\*.png" />
+    <Resource Include="Assets/explorer/*.png" />
   </ItemGroup>
 
 </Project>
