@@ -1,6 +1,6 @@
 namespace FlowState;
 
-public enum WanderState { Idle, Walk, Greet }
+public enum WanderState { Idle, Walk, Greet, Held }
 
 /// <summary>Dururken alınan poz. Sıra, poz şeridindeki kare sırasıyla aynıdır (&lt;id&gt;_poses.png).</summary>
 public enum ZooPose { Stand, Sit, Sleep, Eat, Happy }
@@ -26,8 +26,11 @@ public sealed class Wanderer
     /// <summary>Yürümüyorken gösterilecek poz.</summary>
     public ZooPose Shown => HappyTimer > 0 && Has[(int)ZooPose.Happy] ? ZooPose.Happy : Has[(int)Pose] ? Pose : ZooPose.Stand;
 
-    /// <summary>Zıplamanın o anki dikey kayması (yukarı negatif).</summary>
-    public double HopOffset => HopT < 0 ? 0 : -Math.Sin(Math.PI * HopT) * ZooWorld.HopHeight;
+    /// <summary>Fareyle tutulup taşınıyor.</summary>
+    public bool Held => State == WanderState.Held;
+
+    /// <summary>Zıplamanın o anki dikey kayması (yukarı negatif). Tutulan hayvan biraz havada durur.</summary>
+    public double HopOffset => Held ? -ZooWorld.HoldLift : HopT < 0 ? 0 : -Math.Sin(Math.PI * HopT) * ZooWorld.HopHeight;
 }
 
 /// <summary>
@@ -40,6 +43,7 @@ public sealed class ZooWorld
     public const double Sprite = 96;       // ekrandaki hayvan boyutu (32 px × 3)
     public const double HopHeight = 26, HopSeconds = 0.42;
     public const double Speed = 26;        // piksel/sn — sakin yürüyüş
+    public const double HoldLift = 14;     // tutulan hayvanın yerden yüksekliği
 
     public readonly List<Wanderer> Animals = new();
     public double Width, Height;
@@ -68,6 +72,37 @@ public sealed class ZooWorld
         if (w.State == WanderState.Walk && !w.Arriving) { w.State = WanderState.Idle; w.Timer = 1.0; }
     }
 
+    /// <summary>Taşıma başlar: hayvan ne yapıyorsa bırakır, havaya kalkar.</summary>
+    public void Grab(Wanderer w)
+    {
+        if (double.IsNaN(w.X)) return;
+        w.State = WanderState.Held;
+        w.Arriving = false;
+        w.HopT = -1;
+        w.Pose = ZooPose.Stand;
+        w.NameTimer = 0;
+    }
+
+    /// <summary>Tutulan hayvanı ayaklarının basacağı noktaya taşır (sahne sınırları içinde).</summary>
+    public void DragTo(Wanderer w, double x, double y)
+    {
+        if (!w.Held) return;
+        x = Math.Clamp(x, MinX, MaxX); y = Math.Clamp(y, MinY, MaxY);
+        if (Math.Abs(x - w.X) > 2) w.FacingRight = x > w.X;
+        w.X = x; w.Y = y;
+    }
+
+    /// <summary>Bırakılan hayvan sevinir ve bir süre yeni yerinde kalır, sonra dolaşmaya devam eder.</summary>
+    public void Drop(Wanderer w)
+    {
+        if (!w.Held) return;
+        w.State = WanderState.Idle;
+        w.Pose = ZooPose.Stand;
+        w.HappyTimer = 0.8;
+        w.Timer = Rand(5, 9);
+        w.GreetCooldown = Math.Max(w.GreetCooldown, 3);
+    }
+
     public void Update(double dt)
     {
         if (Width <= 0 || Height <= 0) return;
@@ -84,6 +119,9 @@ public sealed class ZooWorld
 
             switch (w.State)
             {
+                case WanderState.Held:
+                    break;                                     // konumu fare belirler
+
                 case WanderState.Idle:
                     w.Timer -= dt;
                     if (w.Timer <= 0) { PickTarget(w); w.State = WanderState.Walk; w.Pose = ZooPose.Stand; }
@@ -171,7 +209,7 @@ public sealed class ZooWorld
         for (int j = i + 1; j < Animals.Count; j++)
         {
             var a = Animals[i]; var b = Animals[j];
-            if (a.Arriving || b.Arriving || double.IsNaN(a.X) || double.IsNaN(b.X)) continue;
+            if (a.Arriving || b.Arriving || a.Held || b.Held || double.IsNaN(a.X) || double.IsNaN(b.X)) continue;
             double dx = Math.Abs(a.X - b.X), dy = Math.Abs(a.Y - b.Y);
 
             if (dx < 34 && dy < 14)                                // üst üste: biri yürüyüp gitsin

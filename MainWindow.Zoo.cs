@@ -237,7 +237,47 @@ public partial class MainWindow
         var hop = new TranslateTransform();
         var img = new Image { Width = S, Height = S, Source = poses[0], Cursor = Cursors.Hand, RenderTransform = new TransformGroup { Children = { flip, hop } } };
         RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.NearestNeighbor);
-        img.MouseLeftButtonDown += (_, e) => { zooWorld.Poke(w); e.Handled = true; };
+        // Tıklama: zıplar. Basılı tutup sürükleme: hayvanı taşır, bırakınca oraya konar.
+        Point? press = null;
+        Vector grab = default;
+        bool dragging = false;
+        img.MouseLeftButtonDown += (_, e) =>
+        {
+            press = e.GetPosition(canvas);
+            img.CaptureMouse();
+            e.Handled = true;
+        };
+        img.MouseMove += (_, e) =>
+        {
+            if (press is not Point p0 || e.LeftButton != MouseButtonState.Pressed) return;
+            var p = e.GetPosition(canvas);
+            if (!dragging)
+            {
+                if ((p - p0).Length < 5) return;                     // titreme tıklamayı bozmasın
+                dragging = true;
+                grab = new Vector(w.X - p0.X, w.Y - p0.Y);           // tutulan nokta imlecin altında kalsın
+                zooWorld.Grab(w);
+                img.Cursor = Cursors.SizeAll;
+            }
+            zooWorld.DragTo(w, p.X + grab.X, p.Y + grab.Y);
+        };
+        img.MouseLeftButtonUp += (_, e) =>
+        {
+            if (press == null) return;
+            bool wasDrag = dragging;
+            press = null; dragging = false;
+            img.Cursor = Cursors.Hand;
+            img.ReleaseMouseCapture();
+            if (wasDrag) zooWorld.Drop(w); else zooWorld.Poke(w);
+            e.Handled = true;
+        };
+        img.LostMouseCapture += (_, _) =>
+        {
+            // Pencere odağı kaybedilirse vb.: hayvan havada kalmasın.
+            if (dragging) zooWorld.Drop(w);
+            press = null; dragging = false;
+            img.Cursor = Cursors.Hand;
+        };
 
         var text = new TextBlock { FontSize = 12, FontWeight = FontWeights.Bold, Foreground = Brushes.White };
         var bubble = new Border
@@ -278,7 +318,7 @@ public partial class MainWindow
             n.Root.Visibility = Visibility.Visible;
             Canvas.SetLeft(n.Root, Math.Round(w.X - S / 2));
             Canvas.SetTop(n.Root, Math.Round(w.Y - S));
-            Panel.SetZIndex(n.Root, (int)w.Y);                       // aşağıdaki öndedir
+            Panel.SetZIndex(n.Root, w.Held ? 100000 : (int)w.Y);     // aşağıdaki öndedir; taşınan en öndedir
             n.Flip.ScaleX = w.FacingRight ? 1 : -1;                  // kareler sağa bakar
             n.Hop.Y = Math.Round(w.HopOffset);
 
