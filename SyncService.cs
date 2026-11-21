@@ -212,7 +212,14 @@ public sealed class SyncService
             var startedUtc = DateTime.UtcNow;
             var (courses, sessions, tombC, tombS) = await OnUi(() => Snapshot(cfg.LastPushedUtc));
             var animals = await OnUi(() => SnapshotAnimals(cfg.LastPushedUtc));
-            await PushUpsertAsync("courses", courses);
+            try { await PushUpsertAsync("courses", courses); }
+            catch (HttpRequestException ex) when (ex.Message.Contains("archived"))
+            {
+                // Bulutta "archived" sütunu henüz yok (supabase/archive_courses.sql çalıştırılmadı):
+                // dersler yine eşitlensin, yalnızca silinme bilgisi bu cihazda kalsın.
+                foreach (var c in courses) c.Remove("archived");
+                await PushUpsertAsync("courses", courses);
+            }
             await PushUpsertAsync("sessions", sessions);
             await PushUpsertAsync("owned_animals", animals, "user_id,animal_id");
             await PushDeletesAsync("courses", tombC);
@@ -235,7 +242,7 @@ public sealed class SyncService
         var c = data.Courses.Where(x => U(x.UpdatedAt) > since).Select(x => new JsonObject
         {
             ["user_id"] = uid, ["id"] = x.Id, ["name"] = x.Name, ["color"] = x.Color,
-            ["updated_at"] = Iso(x.UpdatedAt), ["deleted"] = false
+            ["updated_at"] = Iso(x.UpdatedAt), ["deleted"] = false, ["archived"] = x.Archived
         }).ToList();
         var s = data.Sessions.Where(x => U(x.UpdatedAt) > since).Select(x => new JsonObject
         {
@@ -366,17 +373,21 @@ public sealed class SyncService
             }
             else if (local == null)
             {
-                data.Courses.Add(new Course { Id = id, Name = r["name"]!.ToString(), Color = r["color"]!.ToString(), UpdatedAt = upd });
+                data.Courses.Add(new Course { Id = id, Name = r["name"]!.ToString(), Color = r["color"]!.ToString(), UpdatedAt = upd, Archived = Archived(r) });
                 changed = true;
             }
             else if (upd > U(local.UpdatedAt))
             {
                 local.Name = r["name"]!.ToString(); local.Color = r["color"]!.ToString(); local.UpdatedAt = upd;
+                // Sütun yoksa (eski şema) yerel silinme bilgisi korunur.
+                if (r.ContainsKey("archived")) local.Archived = Archived(r);
                 changed = true;
             }
         }
         return changed;
     }
+
+    static bool Archived(JsonObject r) => r["archived"] is JsonValue v && v.TryGetValue<bool>(out var b) && b;
 
     static bool SameName(Course a, Course b) =>
         string.Equals(a.Name.Trim(), b.Name.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -398,7 +409,9 @@ public sealed class SyncService
                 if (courseInUse(loser.Id)) continue;
                 foreach (var s in data.Sessions.Where(s => s.CourseId == loser.Id))
                 { s.CourseId = winner.Id; s.UpdatedAt = DateTime.UtcNow; }
-                data.DeleteCourse(loser); // seansları zaten taşındı; ders için silme izi bırakır
+                // Birleşen derslerden biri hâlâ kullanılıyorsa sonuç da kullanılır kalır.
+                if (!loser.Archived) data.RestoreCourse(winner);
+                data.RemoveCourse(loser); // seansları zaten taşındı; ders için silme izi bırakır
                 changed = true;
             }
         }

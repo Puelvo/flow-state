@@ -81,7 +81,8 @@ public static class TimerWidget
 				running = t != 0;
 				elapsed = acc + (running ? (DateTime.UtcNow - new DateTime(t, DateTimeKind.Utc)).TotalSeconds : 0);
 			}
-			course ??= data.Courses.FirstOrDefault(c => c.Id == Preferences.Get("lastCourse", "")) ?? data.Courses.FirstOrDefault();
+			var usable = data.ActiveCourses();
+			course ??= usable.FirstOrDefault(c => c.Id == Preferences.Get("lastCourse", "")) ?? usable.FirstOrDefault();
 
 			double todaySec = data.Sessions.Where(s => s.Start >= DateTime.Today).Sum(s => (double)s.Seconds);
 			if (active && new DateTime(long.Parse(p[1])) >= DateTime.Today) todaySec += elapsed;

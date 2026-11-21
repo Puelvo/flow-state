@@ -9,6 +9,8 @@ public class Course
     public string Name { get; set; } = "";
     public string Color { get; set; } = "#4F8CFF";
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow; // senkron için (UTC)
+    /// <summary>Silinen ders: listelerden kalkar ama kayıtları istatistikte ve geçmişte kalır.</summary>
+    public bool Archived { get; set; }
 
     /// <summary>"Genel": derse bağlı olmayan çalışmalar için sabit kimlikli, silinemeyen ders (her cihazda aynı kimlik).</summary>
     public const string GeneralId = "00000000000000000000000000000001";
@@ -62,10 +64,29 @@ public class AppData
         Courses.Insert(0, new Course { Id = Course.GeneralId, Name = "Genel", Color = "#8791B5" });
     }
 
+    /// <summary>Seçilebilir (silinmemiş) dersler.</summary>
+    public List<Course> ActiveCourses() => Courses.Where(c => !c.Archived).ToList();
+
+    /// <summary>Dersi listeden kaldırır; çalışma kayıtları istatistik ve geçmiş için saklanır.</summary>
     public void DeleteCourse(Course c)
     {
+        if (c.Id == Course.GeneralId || c.Archived) return;
+        c.Archived = true;
+        c.UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Silinmiş dersi kayıtlarıyla birlikte geri getirir.</summary>
+    public void RestoreCourse(Course c)
+    {
+        if (!c.Archived) return;
+        c.Archived = false;
+        c.UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Dersi tamamen kaldırır (yalnızca birleştirme için; seansları önceden taşınmış olmalı).</summary>
+    public void RemoveCourse(Course c)
+    {
         if (c.Id == Course.GeneralId) return;
-        DeleteSessions(s => s.CourseId == c.Id);
         if (Courses.Remove(c)) Tombstones.Add(new Tombstone { Id = c.Id, Kind = "course" });
     }
 

@@ -143,7 +143,7 @@ public partial class MainPage : ContentPage
 		ticker.Start();
 
 		ApplyTheme();
-		ShowTab(sync.SignedIn || data.Courses.Any(c => c.Id != Course.GeneralId) ? 0 : SettingsTab);
+		ShowTab(sync.SignedIn || data.ActiveCourses().Any(c => c.Id != Course.GeneralId) ? 0 : SettingsTab);
 		SyncNotification();
 	}
 
@@ -264,7 +264,7 @@ public partial class MainPage : ContentPage
 	void RefreshChips()
 	{
 		chips.Children.Clear();
-		foreach (var c in data.Courses)
+		foreach (var c in data.ActiveCourses())
 		{
 			var course = c;
 			bool isSel = CurrentCourse?.Id == c.Id;
@@ -290,7 +290,7 @@ public partial class MainPage : ContentPage
 			});
 			chips.Children.Add(chip);
 		}
-		if (!data.Courses.Any(c => c.Id != Course.GeneralId))
+		if (!data.ActiveCourses().Any(c => c.Id != Course.GeneralId))
 		{
 			var add = Pill("＋ İlk dersini ekle", true);
 			Tap(add, () => ShowTab(SettingsTab));
@@ -302,8 +302,10 @@ public partial class MainPage : ContentPage
 	{
 		get
 		{
-			var id = runCourseId ?? pickedCourseId;
-			return data.Courses.FirstOrDefault(c => c.Id == id) ?? data.Courses.FirstOrDefault();
+			// Çalışan seans silinmiş bir derse ait olabilir (başka cihazdan); seçimde yalnızca kullanılan dersler.
+			if (runCourseId != null && data.Courses.FirstOrDefault(c => c.Id == runCourseId) is { } run) return run;
+			var active = data.ActiveCourses();
+			return active.FirstOrDefault(c => c.Id == pickedCourseId) ?? active.FirstOrDefault();
 		}
 	}
 
@@ -421,7 +423,7 @@ public partial class MainPage : ContentPage
 			var track = new Grid { HeightRequest = 8, ColumnDefinitions = { new(new GridLength(Math.Max(share, 0.001), GridUnitType.Star)), new(new GridLength(Math.Max(100 - share, 0.001), GridUnitType.Star)) } };
 			track.Add(new Border { BackgroundColor = col, StrokeThickness = 0, StrokeShape = new RoundRectangle { CornerRadius = 4 } }, 0, 0);
 			var head = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
-			head.Add(Lbl(c.Name, 14, true), 0, 0); head.Add(Lbl($"{Fmt(sec)} · %{(int)share}", 13, false, Muted), 1, 0);
+			head.Add(Lbl(c.Archived ? $"{c.Name} · silindi" : c.Name, 14, true), 0, 0); head.Add(Lbl($"{Fmt(sec)} · %{(int)share}", 13, false, Muted), 1, 0);
 			statsBox.Children.Add(Card(new VerticalStackLayout { Spacing = 8, Children = { head, track } }, 14));
 		}
 
@@ -545,7 +547,7 @@ public partial class MainPage : ContentPage
 				if (await DisplayAlert("Kaydı sil", "Bu çalışma kaydı silinsin mi?", "Sil", "Vazgeç")) { data.DeleteSession(sess); Changed(); }
 			});
 			var dot = Dot(Parse(c?.Color ?? "#8791B5", Muted), 10);
-			var info = new VerticalStackLayout { Spacing = 2, Children = { Lbl(c?.Name ?? "(silinmiş ders)", 15, true), Lbl(s.Start.ToString("d MMM yyyy HH:mm", Tr), 12, false, Muted) } };
+			var info = new VerticalStackLayout { Spacing = 2, Children = { Lbl(c == null ? "(silinmiş ders)" : c.Archived ? $"{c.Name} (silindi)" : c.Name, 15, true), Lbl(s.Start.ToString("d MMM yyyy HH:mm", Tr), 12, false, Muted) } };
 			var dur = Lbl(Fmt(s.Seconds), 14, true); dur.VerticalOptions = LayoutOptions.Center;
 			var row = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto) } };
 			row.Add(dot, 0, 0); row.Add(info, 1, 0); row.Add(dur, 2, 0); row.Add(del, 3, 0);
@@ -610,7 +612,14 @@ public partial class MainPage : ContentPage
 		void Add()
 		{
 			var n = courseName.Text?.Trim();
-			if (string.IsNullOrEmpty(n) || data.Courses.Any(c => c.Name.Equals(n, StringComparison.CurrentCultureIgnoreCase))) return;
+			if (string.IsNullOrEmpty(n)) return;
+			var old = data.Courses.FirstOrDefault(c => c.Name.Equals(n, StringComparison.CurrentCultureIgnoreCase));
+			if (old != null)
+			{
+				// Aynı adla yeniden eklenen silinmiş ders, eski kayıtlarıyla geri gelir.
+				if (old.Archived) { data.RestoreCourse(old); pickedCourseId = old.Id; courseName.Text = ""; Changed(); }
+				return;
+			}
 			var c = new Course { Name = n, Color = Palette[data.Courses.Count % Palette.Length] };
 			data.Courses.Add(c); pickedCourseId = c.Id; courseName.Text = ""; Changed();
 		}
@@ -661,14 +670,14 @@ public partial class MainPage : ContentPage
 		if (!hexEntry.IsFocused) hexEntry.Text = data.WidgetColor.ToUpperInvariant();
 
 		courseBox.Children.Clear();
-		foreach (var c in data.Courses.ToList())
+		foreach (var c in data.ActiveCourses())
 		{
 			var course = c;
 			var del = Lbl("Sil", 14, true, Danger); del.Padding = new Thickness(12, 8); del.VerticalOptions = LayoutOptions.Center;
 			Tap(del, async () =>
 			{
 				if (Active && runCourseId == course.Id) { await DisplayAlert("Ders", "Çalışan seans bu dersi kullanıyor.", "Tamam"); return; }
-				if (await DisplayAlert("Dersi sil", $"\"{course.Name}\" ve tüm kayıtları silinsin mi? Geri alınamaz.", "Sil", "Vazgeç")) { data.DeleteCourse(course); Changed(); }
+				if (await DisplayAlert("Dersi sil", $"\"{course.Name}\" ders listesinden kaldırılsın mı? Çalışma kayıtları istatistiklerde ve geçmişte kalır.", "Sil", "Vazgeç")) { data.DeleteCourse(course); Changed(); }
 			});
 			var row = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) }, Padding = new Thickness(4, 0) };
 			row.Add(Dot(Parse(c.Color, accent), 10), 0, 0);

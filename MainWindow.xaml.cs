@@ -347,7 +347,12 @@ public partial class MainWindow : Window
     {
         double t = active ? sw.Elapsed.TotalSeconds : 0;
         double frac = t % 3600 / 3600;
-        if (frac < 0.002) { RingArc.Visibility = Visibility.Collapsed; ringShown = 0; return; }
+        if (frac < 0.002)
+        {
+            // Yeni tur: önceki turun çizgileri de gizlenmeli, yoksa halka tekrar görününce eski dolu yay geri gelir.
+            for (int i = 0; i < ringShown; i++) ringSegs[i].Visibility = Visibility.Collapsed;
+            RingArc.Visibility = Visibility.Collapsed; ringShown = 0; return;
+        }
         frac = Math.Min(frac, 0.9999);
         EnsureRingSegments();
 
@@ -468,7 +473,7 @@ public partial class MainWindow : Window
     {
         var selId = SelectedCourse?.Id;
         CourseList.Items.Clear();
-        foreach (var c in data.Courses)
+        foreach (var c in data.ActiveCourses())
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal };
             row.Children.Add(new System.Windows.Shapes.Ellipse
@@ -516,6 +521,12 @@ public partial class MainWindow : Window
             data.Courses.Add(existing);
             Save();
         }
+        else if (existing.Archived)
+        {
+            // Aynı adla yeniden eklenen silinmiş ders, eski kayıtlarıyla geri gelir.
+            data.RestoreCourse(existing);
+            Save();
+        }
         NewCourseBox.Clear();
         AddPanel.Visibility = Visibility.Collapsed;
         RefreshCourses();
@@ -529,7 +540,7 @@ public partial class MainWindow : Window
         var c = SelectedCourse;
         if (c == null || active) return;
         if (!ConfirmDialog.Ask(this, "Dersi sil",
-                $"\"{c.Name}\" dersi ve bu derse ait tüm çalışma kayıtları silinecek. Bu işlem geri alınamaz.",
+                $"\"{c.Name}\" ders listesinden kaldırılacak. Çalışma kayıtları istatistiklerde ve geçmişte kalır; aynı adla yeniden eklersen kayıtlarıyla geri gelir.",
                 "Dersi sil")) return;
         data.DeleteCourse(c);
         Save();
@@ -744,7 +755,11 @@ public partial class MainWindow : Window
             var right = new TextBlock { Text = $"{Fmt(sec)}   %{pct:0}", Foreground = Res("Muted") };
             DockPanel.SetDock(right, Dock.Right);
             head.Children.Add(right);
-            head.Children.Add(new TextBlock { Text = c.Name, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+            var title = new TextBlock { FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
+            title.Inlines.Add(new System.Windows.Documents.Run(c.Name));
+            if (c.Archived)
+                title.Inlines.Add(new System.Windows.Documents.Run("  · silindi") { FontWeight = FontWeights.Normal, Foreground = Res("Muted"), FontSize = 12 });
+            head.Children.Add(title);
 
             var bar = new Grid { Height = 8, Margin = new Thickness(0, 8, 0, 0) };
             bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(pct, GridUnitType.Star) });
@@ -832,7 +847,7 @@ public partial class MainWindow : Window
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var date = new TextBlock { Text = s.Start.ToString("d MMM yyyy HH:mm", Tr), Foreground = Res("Muted"), VerticalAlignment = VerticalAlignment.Center };
-            var name = new TextBlock { Text = course?.Name ?? "(silinmiş ders)", VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+            var name = new TextBlock { Text = course == null ? "(silinmiş ders)" : course.Archived ? $"{course.Name} (silindi)" : course.Name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
             var dur = new TextBlock { Text = Fmt(s.Seconds), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
             var del = new Button { Content = "✕", Style = (Style)FindResource("Btn"), Padding = new Thickness(10, 4, 10, 4), ToolTip = "Bu kaydı sil" };
             var session = s;
