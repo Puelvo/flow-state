@@ -158,9 +158,12 @@
             </Button>
         </Grid>
 
-        <!-- Çalışma görünümü -->
+        <!-- Çalışma görünümü: ders chip'leri, beyaz bir disk üstünde ilerleme çemberi, büyük süre, saat yıldızları, şeker düğmeler -->
         <ScrollViewer x:Name="TimerView" Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="TimerPanel" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24,12,24,28" MaxWidth="760">
+
+                <TextBlock x:Name="TimerHello" Text="Bugün neye odaklanıyoruz?" Style="{StaticResource PageSub}"
+                           HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,8"/>
 
                 <ListBox x:Name="CourseList" HorizontalAlignment="Center" SelectionChanged="CourseList_SelectionChanged">
                     <ListBox.ItemsPanel>
@@ -171,50 +174,84 @@
                 </ListBox>
 
                 <StackPanel x:Name="CourseTools" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,0">
-                    <Button Content="＋ Ders" Style="{StaticResource Btn}" Padding="12,5" FontSize="12"
-                            Foreground="{StaticResource Muted}" Background="Transparent" Click="ToggleAdd_Click"/>
-                    <Button x:Name="DeleteCourseBtn" Content="Dersi sil" Style="{StaticResource Btn}" Padding="12,5" FontSize="12"
-                            Foreground="#E58A8A" Background="Transparent" Click="DeleteCourse_Click"/>
+                    <Button Style="{StaticResource Ghost}" FontSize="12" Padding="10,5" Click="ToggleAdd_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconPlus}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.6"/>
+                            <TextBlock Text="Ders ekle" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="DeleteCourseBtn" Style="{StaticResource Ghost}" FontSize="12" Padding="10,5" Margin="4,0,0,0"
+                            Foreground="{StaticResource Danger}" Click="DeleteCourse_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconTrash}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.4"/>
+                            <TextBlock Text="Dersi sil" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
 
-                <StackPanel x:Name="AddPanel" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0" Visibility="Collapsed">
-                    <TextBox x:Name="NewCourseBox" Width="220" MaxLength="40" KeyDown="NewCourseBox_KeyDown"/>
-                    <Button Content="Ekle" Style="{StaticResource Btn}" Margin="8,0,0,0" Click="AddCourse_Click"/>
-                </StackPanel>
+                <!-- Yeni ders: küçük beyaz kart -->
+                <Border x:Name="AddPanel" Style="{StaticResource Card}" HorizontalAlignment="Center" Margin="0,8,0,0"
+                        Padding="10" CornerRadius="20" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox x:Name="NewCourseBox" Width="220" MaxLength="40" KeyDown="NewCourseBox_KeyDown"
+                                 ToolTip="Ders adını yaz, Enter ile ekle"/>
+                        <Button Content="Ekle" Style="{StaticResource Primary}" Padding="16,8" Margin="8,0,0,0" Click="AddCourse_Click"/>
+                    </StackPanel>
+                </Border>
 
-                <!-- Çember -->
-                <Grid x:Name="RingHost" Width="320" Height="320" Margin="0,22,0,0" HorizontalAlignment="Center"
+                <!--
+                    Çember: beyaz, gölgeli bir disk; üstünde yumuşak iz halkası ve tema renginde kalın ilerleme yayı (RingArc, kodda çizilir).
+                    Ortada dersin renginde pastel bir yüz (RingFace) var; oturum sürerken yavaşça "nefes alır".
+                -->
+                <Grid x:Name="RingHost" Width="320" Height="320" Margin="0,18,0,0" HorizontalAlignment="Center"
                       Background="Transparent" Cursor="Hand" ToolTip="Başlat / duraklat"
                       PreviewMouseLeftButtonDown="Ring_Down" MouseMove="Ring_Move" MouseLeftButtonUp="Ring_Up">
+                    <Ellipse Fill="{StaticResource Surface}" Effect="{StaticResource SoftShadow}"/>
+                    <Ellipse x:Name="RingFace" Width="236" Height="236" Fill="{StaticResource Panel2}"
+                             Stroke="{StaticResource Line}" StrokeThickness="2.5" StrokeDashArray="0.01 2.8"
+                             StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
+                        <Ellipse.RenderTransform><ScaleTransform x:Name="RingFaceScale"/></Ellipse.RenderTransform>
+                    </Ellipse>
                     <Grid Width="300" Height="300">
-                        <Ellipse Width="300" Height="300" Stroke="#30FFFFFF" StrokeThickness="20"/>
+                        <Ellipse Width="300" Height="300" Stroke="{StaticResource Track}" StrokeThickness="20"/>
                         <Canvas x:Name="RingArc" Width="300" Height="300" Visibility="Collapsed"/>
                     </Grid>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="200">
-                        <TextBlock x:Name="TimerCourseName" Text="Bir ders seç" FontSize="24" FontWeight="SemiBold"
+                        <TextBlock x:Name="TimerCourseName" Text="Bir ders seç" FontSize="22" FontWeight="Black"
+                                   Foreground="{StaticResource Text}"
                                    TextAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="68"/>
-                        <TextBlock x:Name="TimerStatus" Foreground="{StaticResource Muted}" FontSize="14"
-                                   TextAlignment="Center" Margin="0,6,0,0"/>
+                        <!-- Durum rozeti: hazır / odakta / mola -->
+                        <Border x:Name="StatusPill" HorizontalAlignment="Center" Margin="0,6,0,0" Padding="10,3,12,4"
+                                CornerRadius="12" Background="{StaticResource Panel2}">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse x:Name="TimerStatusDot" Width="8" Height="8" Fill="{StaticResource Good}"
+                                         VerticalAlignment="Center" Margin="0,1,6,0"/>
+                                <TextBlock x:Name="TimerStatus" Foreground="{StaticResource Muted}" FontSize="13" FontWeight="ExtraBold"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
                         <!-- Gezgin: odaklanırken çemberin içinde yürür (MainWindow.Explorer.cs) -->
-                        <Image x:Name="RingWalker" Width="92" Height="92" Margin="0,8,0,0" HorizontalAlignment="Center"
+                        <Image x:Name="RingWalker" Width="92" Height="92" Margin="0,6,0,0" HorizontalAlignment="Center"
                                RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False"/>
                     </StackPanel>
                 </Grid>
 
-                <!-- Çalışma süresi (çemberin altında) -->
-                <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="38" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" Margin="0,14,0,0"/>
+                <!-- Çalışma süresi (çemberin altında): büyük ve kalın -->
+                <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="46" FontWeight="Black" Foreground="{StaticResource Text}"
+                           Typography.NumeralAlignment="Tabular" HorizontalAlignment="Center" Margin="0,16,0,0"/>
 
-                <!-- Tamamlanan saatler -->
-                <StackPanel x:Name="HourPips" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0" Height="14"/>
-                <TextBlock x:Name="PipsLabel" Foreground="#C9D0EE" FontSize="15" FontWeight="Medium"
-                           HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                <!-- Tamamlanan saatler: her saat için altın bir yıldızcık, süren saat için boş yıldız -->
+                <StackPanel x:Name="HourPips" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0" Height="18"/>
+                <TextBlock x:Name="PipsLabel" Foreground="{StaticResource Muted}" FontSize="14" FontWeight="Bold"
+                           HorizontalAlignment="Center" Margin="0,6,0,0"/>
 
-                <StackPanel x:Name="BtnRow" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,24,0,0">
-                    <Button x:Name="StartBtn" Style="{StaticResource Round}" Width="84" Height="84" Content="▶"
-                            Background="{DynamicResource Accent}" Foreground="#0A0E1A" Margin="0,0,18,0" Click="StartBtn_Click"/>
-                    <Button x:Name="FinishBtn" Style="{StaticResource Round}" Width="84" Height="84" Content="■"
-                            FontSize="22" Click="FinishBtn_Click"/>
+                <StackPanel x:Name="BtnRow" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+                    <Button x:Name="StartBtn" Style="{StaticResource Round}" Width="92" Height="92" VerticalAlignment="Center"
+                            Background="{DynamicResource Accent}" Foreground="{DynamicResource OnAccent}" Margin="0,0,18,0"
+                            ToolTip="Başlat / duraklat (Boşluk)" Click="StartBtn_Click"/>
+                    <Button x:Name="FinishBtn" Style="{StaticResource Round}" Width="72" Height="72" VerticalAlignment="Center"
+                            Background="{StaticResource DangerSoft}" Foreground="{StaticResource Danger}"
+                            ToolTip="Oturumu bitir ve kaydet" Click="FinishBtn_Click"/>
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>

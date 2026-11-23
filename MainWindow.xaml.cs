@@ -435,25 +435,33 @@ public partial class MainWindow : Window
             ringSegs[i].Stroke = new SolidColorBrush(GradAt(acc, (i + 0.8) / 360.0));
     }
 
+    int pipsShown = int.MinValue;
+
     void UpdatePips()
     {
         int laps = ActiveSeconds / 3600;
+        // Her saniye yeniden kurmamak için yalnızca sayı değişince çizilir.
+        int key = active ? laps : -1;
+        if (key == pipsShown) return;
+        bool grew = pipsShown >= 0 && key > pipsShown;
+        pipsShown = key;
+
         HourPips.Children.Clear();
-        Brush color = new SolidColorBrush(WidgetColor());
         int shown = Math.Min(laps, 12);
         for (int i = 0; i < shown; i++)
-            HourPips.Children.Add(new System.Windows.Shapes.Ellipse
-            {
-                Width = 12, Height = 12, Fill = color, Margin = new Thickness(4, 0, 4, 0)
-            });
+        {
+            var star = PipStar(true);
+            HourPips.Children.Add(star);
+            if (grew && i == shown - 1) PopIn(star); // yeni kazanılan yıldız küçük bir zıplamayla belirir
+        }
         if (laps > 12)
-            HourPips.Children.Add(new TextBlock { Text = $"+{laps - 12}", Foreground = IconLight, FontSize = 14, Margin = new Thickness(4, -1, 4, 0) });
-        if (active)
-            HourPips.Children.Add(new System.Windows.Shapes.Ellipse
-            {
-                Width = 12, Height = 12, Stroke = color, StrokeThickness = 1.5, Margin = new Thickness(4, 0, 4, 0)
-            });
-        PipsLabel.Text = !active ? "" : laps == 0 ? "İlk saatin turu" : $"{laps} saat tamamlandı";
+        {
+            var more = new TextBlock { Text = $"+{laps - 12}", FontSize = 13, FontWeight = FontWeights.ExtraBold, Margin = new Thickness(3, 0, 3, 0), VerticalAlignment = VerticalAlignment.Center };
+            more.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+            HourPips.Children.Add(more);
+        }
+        if (active) HourPips.Children.Add(PipStar(false));
+        PipsLabel.Text = !active ? "" : laps == 0 ? "İlk yıldızın yolda" : $"{laps} saat tamamlandı";
     }
 
     void Tick()
@@ -490,8 +498,9 @@ public partial class MainWindow : Window
             var row = new StackPanel { Orientation = Orientation.Horizontal };
             row.Children.Add(new System.Windows.Shapes.Ellipse
             {
-                Width = 10, Height = 10, Fill = ParseBrush(c.Color),
-                Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center
+                Width = 12, Height = 12, Fill = ParseBrush(c.Color),
+                Stroke = new SolidColorBrush(Color.FromArgb(0x30, 0x50, 0x2A, 0x10)), StrokeThickness = 1,
+                Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center
             });
             row.Children.Add(new TextBlock { Text = c.Name, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 160 });
             CourseList.Items.Add(new ListBoxItem { Content = row, Tag = c });
@@ -602,21 +611,21 @@ public partial class MainWindow : Window
         CourseTools.IsHitTestVisible = !active;
         if (active) AddPanel.Visibility = Visibility.Collapsed;
 
-        TimerStatus.Text = !active ? (course == null ? "" : "Başlamaya hazır")
-            : !sw.IsRunning ? "Duraklatıldı"
-            : "Odaklanıyorsun";
+        UpdateStatusPill(course);
+        UpdateRingFace(course);
+        SetBreathing(active && sw.IsRunning);
 
-        // Çember ve başlat butonu ayarlardaki tema rengini alır.
+        // Çember ve başlat butonu ayarlardaki tema rengini alır (StartBtn: DynamicResource Accent).
+        // Widget'ta parıltı yok: sakin, sabit görünüm. Açık zeminde hafif, renkli bir hale yeter.
         var tc = WidgetColor();
-        Brush ring = new SolidColorBrush(tc);
-        StartBtn.Background = ring;
-        // Widget'ta parıltı yok: sakin, sabit görünüm.
-        RingArc.Effect = widgetMode ? null : new System.Windows.Media.Effects.DropShadowEffect
-        { Color = tc, BlurRadius = 24, ShadowDepth = 0, Opacity = 0.65 };
+        if (widgetMode) RingArc.Effect = null;
+        else if (RingArc.Effect is not System.Windows.Media.Effects.DropShadowEffect glow || glow.Color != tc)
+            RingArc.Effect = new System.Windows.Media.Effects.DropShadowEffect
+            { Color = tc, BlurRadius = 14, ShadowDepth = 2, Direction = 270, Opacity = 0.35 };
 
         int es = ActiveSeconds;
         ElapsedText.Text = Clock(es);
-        ElapsedText.Opacity = !active ? 0.35 : sw.IsRunning ? 1 : 0.6;
+        ElapsedText.Opacity = !active ? 0.4 : sw.IsRunning ? 1 : 0.6;
 
         UpdateRing();
         UpdatePips();
@@ -915,6 +924,7 @@ public partial class MainWindow : Window
             if (WindowState != WindowState.Normal) WindowState = WindowState.Normal;
 
             TopBar.Visibility = Visibility.Collapsed;
+            TimerHello.Visibility = Visibility.Collapsed;
             CourseTools.Visibility = Visibility.Collapsed;
             AddPanel.Visibility = Visibility.Collapsed;
             WidgetFrame.Visibility = Visibility.Visible;
@@ -927,10 +937,11 @@ public partial class MainWindow : Window
             TimerPanel.Margin = new Thickness(0);
             RingHost.Margin = new Thickness(0);
             BtnRow.Margin = new Thickness(0, 6, 0, 0);
-            StartBtn.Width = StartBtn.Height = FinishBtn.Width = FinishBtn.Height = 60;
-            TimerCourseName.FontSize = 30;
-            TimerStatus.FontSize = 20;
-            ElapsedText.FontSize = 24;
+            StartBtn.Width = StartBtn.Height = 60;
+            FinishBtn.Width = FinishBtn.Height = 50;
+            TimerCourseName.FontSize = 28;
+            TimerStatus.FontSize = 18;
+            ElapsedText.FontSize = 25;
             ElapsedText.Margin = new Thickness(0, 2, 0, 0);
             TimerPanel.LayoutTransform = new ScaleTransform(WidgetScale, WidgetScale);
 
@@ -961,6 +972,7 @@ public partial class MainWindow : Window
             MinWidth = normalMinW; MinHeight = normalMinH;
 
             TopBar.Visibility = Visibility.Visible;
+            TimerHello.Visibility = Visibility.Visible;
             CourseTools.Visibility = Visibility.Visible;
             WidgetFrame.Visibility = Visibility.Collapsed;
             WidgetBar.Visibility = Visibility.Collapsed;
@@ -970,13 +982,14 @@ public partial class MainWindow : Window
             HourPips.Visibility = Visibility.Visible;
             PipsLabel.Visibility = Visibility.Visible;
             TimerPanel.Margin = new Thickness(24, 12, 24, 28);
-            RingHost.Margin = new Thickness(0, 22, 0, 0);
-            BtnRow.Margin = new Thickness(0, 24, 0, 0);
-            StartBtn.Width = StartBtn.Height = FinishBtn.Width = FinishBtn.Height = 84;
-            TimerCourseName.FontSize = 24;
-            TimerStatus.FontSize = 14;
-            ElapsedText.FontSize = 38;
-            ElapsedText.Margin = new Thickness(0, 14, 0, 0);
+            RingHost.Margin = new Thickness(0, 18, 0, 0);
+            BtnRow.Margin = new Thickness(0, 20, 0, 0);
+            StartBtn.Width = StartBtn.Height = 92;
+            FinishBtn.Width = FinishBtn.Height = 72;
+            TimerCourseName.FontSize = 22;
+            TimerStatus.FontSize = 13;
+            ElapsedText.FontSize = 46;
+            ElapsedText.Margin = new Thickness(0, 16, 0, 0);
             TimerPanel.LayoutTransform = Transform.Identity;
 
             Left = normalBounds.X; Top = normalBounds.Y;
@@ -1044,30 +1057,41 @@ public partial class MainWindow : Window
     }
 
     // ---------- yuvarlak düğme ikonları ----------
+    // Renkleri içinde bulundukları düğmenin Foreground'undan gelir: başlat = OnAccent, bitir = Danger.
 
-    static readonly Brush IconDark = new SolidColorBrush(Color.FromRgb(0x0A, 0x0E, 0x1A));
-    static readonly Brush IconLight = new SolidColorBrush(Color.FromRgb(0xEE, 0xF1, 0xFF));
+    static System.Windows.Data.Binding ForegroundOfButton() => new("Foreground")
+    { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(Button), 1) };
 
-    static UIElement PlayIcon() => new System.Windows.Shapes.Path
+    static UIElement PlayIcon()
     {
-        Data = Geometry.Parse("M 3,2 L 21,12 L 3,22 Z"),
-        Fill = IconDark, Stroke = IconDark, StrokeThickness = 5,
-        StrokeLineJoin = PenLineJoin.Round, Width = 26, Height = 26, Stretch = Stretch.None,
-        Margin = new Thickness(4, 0, 0, 0)
-    };
-
-    static UIElement PauseIcon() => new StackPanel
-    {
-        Orientation = Orientation.Horizontal,
-        Children =
+        var p = new System.Windows.Shapes.Path
         {
-            new Border { Width = 8, Height = 24, CornerRadius = new CornerRadius(4), Background = IconDark },
-            new Border { Width = 8, Height = 24, CornerRadius = new CornerRadius(4), Background = IconDark, Margin = new Thickness(7, 0, 0, 0) }
-        }
-    };
+            Data = Geometry.Parse("M 3,2 L 21,12 L 3,22 Z"),
+            StrokeThickness = 5, StrokeLineJoin = PenLineJoin.Round, Width = 26, Height = 26, Stretch = Stretch.None,
+            Margin = new Thickness(5, 0, 0, 0)
+        };
+        p.SetBinding(System.Windows.Shapes.Shape.FillProperty, ForegroundOfButton());
+        p.SetBinding(System.Windows.Shapes.Shape.StrokeProperty, ForegroundOfButton());
+        return p;
+    }
 
-    static UIElement StopIcon() => new Border
-    { Width = 22, Height = 22, CornerRadius = new CornerRadius(7), Background = IconLight };
+    static UIElement PauseIcon()
+    {
+        static Border Bar(double left)
+        {
+            var b = new Border { Width = 8, Height = 24, CornerRadius = new CornerRadius(4), Margin = new Thickness(left, 0, 0, 0) };
+            b.SetBinding(Border.BackgroundProperty, ForegroundOfButton());
+            return b;
+        }
+        return new StackPanel { Orientation = Orientation.Horizontal, Children = { Bar(0), Bar(7) } };
+    }
+
+    static UIElement StopIcon()
+    {
+        var b = new Border { Width = 20, Height = 20, CornerRadius = new CornerRadius(6) };
+        b.SetBinding(Border.BackgroundProperty, ForegroundOfButton());
+        return b;
+    }
 
     // ---------- ayarlar ----------
 
