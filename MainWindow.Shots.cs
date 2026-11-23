@@ -47,8 +47,9 @@ public partial class MainWindow
         data.Sessions.Add(new Session { CourseId = courses[0].Id, Start = Today.AddHours(9.5), Seconds = 5100 });
         data.Sessions.Add(new Session { CourseId = courses[1].Id, Start = Today.AddHours(11.2), Seconds = 2700 });
 
-        foreach (var id in new[] { "zebra", "giraffe", "lion" })
-            data.OwnedAnimals.Add(new OwnedAnimal { AnimalId = id, Price = ZooCatalog.Find(id)!.Price });
+        // Hayvanlar geçmişte alınmış olsun: uzun seanslar nadir dost (altın / yavru) getirebilsin.
+        foreach (var (id, daysAgo) in new[] { ("zebra", 124), ("giraffe", 90), ("lion", 40) })
+            data.OwnedAnimals.Add(new OwnedAnimal { AnimalId = id, Price = ZooCatalog.Find(id)!.Price, BoughtAt = DateTime.UtcNow.AddDays(-daysAgo) });
         // Market'te hem alınabilen (gergedan, 80) hem kilitli (fil, 120) kart görünsün: bakiye ~100.
         // Oturumlara dokunmadan aslanın "ödenen" fiyatı ayarlanır (yalnızca örnek veri).
         var lion = data.OwnedAnimals.Last();

@@ -133,7 +133,7 @@ public sealed class ZooWorld
             double side = i % 2 == 0 ? -1 : 1, ring = 1 + i / 2;
             w.Welcoming = true; w.Arriving = false;
             w.Pose = ZooPose.Stand; w.State = WanderState.Walk;
-            w.TargetX = Math.Clamp(v.X + side * (62 + ring * 34 + Rand(-6, 6)), MinX, MaxX);
+            w.TargetX = Math.Clamp(v.X + side * (56 + ring * 52 + Rand(-6, 6)), MinX, MaxX);
             w.TargetY = Math.Clamp(v.Y + Rand(-22, 22), MinY, MaxY);
         }
     }
