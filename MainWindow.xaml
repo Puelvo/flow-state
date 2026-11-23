@@ -252,7 +252,7 @@
                 <!-- Mod seçici: başlat/bitir düğmelerinin hemen üstünde; oturum başlayınca gizlenir.
                      Geri sayım'a tıklanınca süre menüsü (DurationPopup) açılır. -->
                 <StackPanel x:Name="ModePanel" HorizontalAlignment="Center" Margin="0,14,0,0">
-                    <Border Style="{StaticResource SegBar}" Padding="4">
+                    <Border x:Name="ModeBar" Style="{StaticResource SegBar}" Padding="4">
                         <StackPanel Orientation="Horizontal">
                             <RadioButton x:Name="ModeStopwatch" GroupName="timermode" Style="{StaticResource Seg}" IsChecked="True" Checked="Mode_Checked"
                                          ToolTip="Süre ileri doğru sayar; istediğin zaman bitir">
@@ -271,8 +271,8 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Süre menüsü: hazır süreler + özel süre (−/+, fare tekerleği). Dışarı tıklayınca kapanır. -->
-                    <Popup x:Name="DurationPopup" PlacementTarget="{Binding ElementName=ModeCountdown}" Placement="Custom"
+                    <!-- Süre menüsü (seçicinin ortasında, üstünde): hazır süreler + özel süre (−/+, fare tekerleği). Dışarı tıklayınca kapanır. -->
+                    <Popup x:Name="DurationPopup" PlacementTarget="{Binding ElementName=ModeBar}" Placement="Custom"
                            StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
                         <Border Margin="22" Style="{StaticResource Card}" Padding="20,18,20,16" Width="318"
                                 TextElement.FontFamily="{StaticResource AppFont}" TextElement.FontWeight="SemiBold">

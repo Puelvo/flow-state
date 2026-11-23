@@ -1246,7 +1246,7 @@ public partial class MainWindow : Window
         }
     }
 
-    // Menü, Geri sayım düğmesinin tam üstünde ve ortasında açılır.
+    // Menü, mod seçicinin tam üstünde ve ortasında açılır.
     System.Windows.Controls.Primitives.CustomPopupPlacement[] PlaceDurationPopup(Size popup, Size target, Point offset)
         => new[] { new System.Windows.Controls.Primitives.CustomPopupPlacement(
             new Point((target.Width - popup.Width) / 2, -popup.Height + 14), System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal) };
