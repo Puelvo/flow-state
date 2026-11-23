@@ -60,6 +60,45 @@ public sealed class ZooWorld
     /// <summary>Hayvanların durmadığı alan (ör. çimendeki düğmeler); boşsa yok. Sahne pikseli, ayak noktası.</summary>
     public (double L, double T, double R, double B)? Avoid;
 
+    /// <summary>İki hayvanın arasında kalması gereken yatay boşluk (yavrular küçük, daha yakın durabilir).</summary>
+    static double Space(Wanderer a, Wanderer b) => a.Follow != null || b.Follow != null ? 46 : 68;
+    const double SpaceY = 26;
+
+    /// <summary>Bir hayvanın durduğu ya da gitmekte olduğu nokta.</summary>
+    static (double X, double Y) Spot(Wanderer o) => o.State == WanderState.Walk ? (o.TargetX, o.TargetY) : (o.X, o.Y);
+
+    /// <summary>Bu noktada başkasıyla iç içe geçer mi? Anne-yavru ve gezgin de hesaba katılır.</summary>
+    double Crowd(double x, double y, Wanderer self)
+    {
+        double worst = double.MaxValue;   // en yakın komşuya kalan pay (negatif: iç içe)
+        foreach (var o in Animals)
+        {
+            if (o == self || double.IsNaN(o.X) || o.Arriving) continue;
+            var (ox, oy) = Spot(o);
+            if (Math.Abs(y - oy) >= SpaceY) continue;
+            worst = Math.Min(worst, Math.Abs(x - ox) - Space(self, o));
+        }
+        if (!double.IsNaN(Keeper.X) && Math.Abs(y - Keeper.Y) < SpaceY)
+            worst = Math.Min(worst, Math.Abs(x - Keeper.X) - 56);
+        return worst;
+    }
+
+    /// <summary>Üreticiden en fazla 10 aday alır; ilk boş olanı, yoksa en ferahını hedef yapar.</summary>
+    void Aim(Wanderer w, Func<(double X, double Y)> candidate)
+    {
+        double bestGap = double.MinValue; (double X, double Y) best = (w.X, w.Y);
+        for (int i = 0; i < 10; i++)
+        {
+            var (cx, cy) = candidate();
+            cy = Math.Clamp(cy, MinY, MaxY);
+            cx = Clear(Math.Clamp(cx, MinX, MaxX), cy);
+            double gap = Crowd(cx, cy, w);
+            if (gap >= 0) { best = (cx, cy); break; }
+            if (gap > bestGap) { bestGap = gap; best = (cx, cy); }
+        }
+        w.TargetX = best.X; w.TargetY = best.Y;
+    }
+
     /// <summary>Hedef yasak alandaysa yatayda en yakın kenarın dışına iter.</summary>
     double Clear(double x, double y)
     {
@@ -153,8 +192,9 @@ public sealed class ZooWorld
             double side = i % 2 == 0 ? -1 : 1, ring = 1 + i / 2;
             w.Welcoming = true; w.Arriving = false;
             w.Pose = ZooPose.Stand; w.State = WanderState.Walk;
-            w.TargetY = Math.Clamp(v.Y + Rand(-22, 22), MinY, MaxY);
-            w.TargetX = Clear(Math.Clamp(v.X + side * (56 + ring * 52 + Rand(-6, 6)), MinX, MaxX), w.TargetY);
+            double row = (i / 2) % 2 == 0 ? -14 : 16;          // önlü arkalı iki sıra
+            double baseX = v.X + side * (40 + ring * 74);
+            Aim(w, () => (baseX + Rand(-8, 8), v.Y + row + Rand(-4, 4)));
         }
     }
 
@@ -251,6 +291,7 @@ public sealed class ZooWorld
         else
         {
             w.X = Clear(Rand(MinX, MaxX), w.Y);
+            for (int i = 0; i < 10 && Crowd(w.X, w.Y, w) < 0; i++) { w.Y = Rand(MinY, MaxY); w.X = Clear(Rand(MinX, MaxX), w.Y); }
             w.FacingRight = rng.Next(2) == 0;
             w.Timer = Rand(0.3, 4);
             w.GreetCooldown = Rand(2, 8);
@@ -262,16 +303,14 @@ public sealed class ZooWorld
         if (Celebrating > 0)
         {
             // Kutlama sürerken gezginin yakınında dolaşırlar.
-            w.TargetY = Math.Clamp(Keeper.Y + Rand(-30, 30), MinY, MaxY);
-            w.TargetX = Clear(Math.Clamp(Keeper.X + Rand(-150, 150), MinX, MaxX), w.TargetY);
+            Aim(w, () => (Keeper.X + Rand(-170, 170), Keeper.Y + Rand(-34, 34)));
             return;
         }
         if (w.Follow is { } parent && !double.IsNaN(parent.X) && rng.NextDouble() < 0.8)
         {
             // Yavru: annesinin arkasında, biraz yanında durur.
             double behind = parent.FacingRight ? -1 : 1;
-            w.TargetY = Math.Clamp(parent.Y + Rand(4, 16), MinY, MaxY);
-            w.TargetX = Clear(Math.Clamp(parent.X + behind * Rand(38, 60), MinX, MaxX), w.TargetY);
+            Aim(w, () => (parent.X + behind * Rand(48, 72), parent.Y + Rand(4, 18)));
             return;
         }
         // Ara sıra bir arkadaşının yanına gider; böylece karşılaşmalar kendiliğinden olur.
@@ -280,13 +319,11 @@ public sealed class ZooWorld
         {
             var o = others[rng.Next(others.Count)];
             double side = w.X < o.X ? -1 : 1;
-            w.TargetY = Math.Clamp(o.Y + Rand(-6, 6), MinY, MaxY);
-            w.TargetX = Clear(Math.Clamp(o.X + side * 58, MinX, MaxX), w.TargetY);
+            Aim(w, () => (o.X + side * Rand(74, 82), o.Y + Rand(-6, 6)));
             return;
         }
         double ang = Rand(0, Math.PI * 2), d = Mood == ZooMood.Calm ? Rand(30, 100) : Mood == ZooMood.Play ? Rand(90, 280) : Rand(70, 240);
-        w.TargetY = Math.Clamp(w.Y + Math.Sin(ang) * d * 0.6, MinY, MaxY);
-        w.TargetX = Clear(Math.Clamp(w.X + Math.Cos(ang) * d, MinX, MaxX), w.TargetY);
+        Aim(w, () => { double a = Rand(0, Math.PI * 2); return (w.X + Math.Cos(a) * d, w.Y + Math.Sin(a) * d * 0.6); });
     }
 
     /// <summary>Yan yana gelen iki hayvan selamlaşır; üst üste binenlerden biri uzaklaşır.</summary>
@@ -300,17 +337,18 @@ public sealed class ZooWorld
             double dx = Math.Abs(a.X - b.X), dy = Math.Abs(a.Y - b.Y);
 
             if (a.Follow == b || b.Follow == a) continue;          // anne-yavru yan yana durabilir
-            if (dx < 34 && dy < 14)                                // üst üste: biri yürüyüp gitsin
+            if (dx < Space(a, b) - 6 && dy < SpaceY - 4)           // iç içe: biri yürüyüp boş bir yere gitsin
             {
-                var mover = b.Pose != ZooPose.Sleep ? b : a;
-                if (mover.State == WanderState.Idle && mover.Pose != ZooPose.Sleep) mover.Timer = 0;
+                if (a.State == WanderState.Walk || b.State == WanderState.Walk) continue;   // yoldan geçen geçip gider
+                var mover = b.Pose != ZooPose.Sleep ? b : a.Pose != ZooPose.Sleep ? a : b;
+                if (mover.State == WanderState.Idle) { mover.Pose = ZooPose.Stand; mover.Timer = 0; }
                 continue;
             }
             if (a.State == WanderState.Greet || b.State == WanderState.Greet) continue;
             if (a.Welcoming || b.Welcoming) continue;                              // gezgine gidenler yolda oyalanmaz
             if (a.GreetCooldown > 0 || b.GreetCooldown > 0) continue;
             if (a.Pose == ZooPose.Sleep || b.Pose == ZooPose.Sleep) continue;        // uyuyan rahatsız edilmez
-            if (dx > 76 || dy > 22) continue;
+            if (dx > 92 || dy > 22) continue;
 
             foreach (var w in new[] { a, b })
             {
