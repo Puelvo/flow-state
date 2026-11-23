@@ -1238,7 +1238,7 @@ public partial class MainWindow : Window
             var b = new Button
             {
                 Style = (Style)FindResource(sel ? "Primary" : "Btn"), Margin = new Thickness(4), Padding = new Thickness(0, 7, 0, 7),
-                Width = 78, Content = m >= 60 && m % 60 == 0 ? $"{m / 60} saat" : $"{m} dk"
+                Content = m >= 60 && m % 60 == 0 ? $"{m / 60} saat" : $"{m} dk"
             };
             int pick = m;
             b.Click += (_, _) => { SetDuration(pick); DurationPopup.IsOpen = false; };
