@@ -252,7 +252,7 @@ public partial class MainWindow
             tile.Children.Add(new TextBlock { Text = m.Name, FontSize = 12, FontWeight = FontWeights.ExtraBold, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res(open ? "Text" : "Muted"), Margin = new Thickness(0, 4, 0, 0) });
             tile.Children.Add(new TextBlock
             {
-                Text = open ? "bahçende" : $"{Math.Ceiling(m.Hours - hours)} saat kaldı", FontSize = 11, FontWeight = FontWeights.Bold,
+                Text = open ? "bahçende" : "çalıştıkça gelecek", FontSize = 11, FontWeight = FontWeights.Bold,
                 HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res(open ? "Good" : "Faint")
             });
             row.Children.Add(tile);
