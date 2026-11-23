@@ -144,6 +144,7 @@ public partial class MainWindow
         zooWorld.Mood = !active ? ZooMood.Free : sw.IsRunning ? ZooMood.Calm : ZooMood.Play;
         zooWorld.KeeperWalking = active && sw.IsRunning;
         zooWorld.Night = DayCycle.IsNight(sunPalette);
+        zooWorld.Noon = !zooWorld.Night && sunPalette.Stars < 0.1 && (Theme == GardenTheme.Day || (Theme == GardenTheme.Auto && DateTime.Now.Hour is >= 11 and < 16));
         emptyHint!.Visibility = zooWorld.Animals.Count == 0 && !widgetMode ? Visibility.Visible : Visibility.Collapsed;
     }
 

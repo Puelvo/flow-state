@@ -503,6 +503,7 @@ public partial class MainWindow
         zooClock.Restart();
         zooWorld.Update(dt);
         TickKeeper();
+        TickAmbient(dt);
 
         const double S = ZooWorld.Sprite;
         foreach (var n in zooNodes)

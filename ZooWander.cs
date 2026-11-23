@@ -2,6 +2,9 @@
 
 public enum WanderState { Idle, Walk, Greet }
 
+/// <summary>Bahçede hayvanların gidebileceği yerler.</summary>
+public enum ZooSpotKind { None, Pond, Shade }
+
 /// <summary>Bahçenin havası: oturuma göre. Çalışırken sakin, molada oyunbaz.</summary>
 public enum ZooMood { Free, Calm, Play }
 
@@ -27,6 +30,7 @@ public sealed class Wanderer
     public bool[] Has = { true, true, true, true, true };   // bu hayvanda hangi pozlar var (çizen taraf doldurur)
     public Wanderer? Follow;              // yavru: annesinin/babasının peşinden gider
     public bool Welcoming;                // gezgini karşılamaya gidiyor (varınca selamlar)
+    public ZooSpotKind Intent;            // gittiği yer: gölet (su içer) ya da ağaç gölgesi (dinlenir)
 
     /// <summary>Yürümüyorken gösterilecek poz.</summary>
     public ZooPose Shown => HappyTimer > 0 && Has[(int)ZooPose.Happy] ? ZooPose.Happy : Has[(int)Pose] ? Pose : ZooPose.Stand;
@@ -102,11 +106,33 @@ public sealed class ZooWorld
     /// <summary>Hedef yasak alandaysa yatayda en yakın kenarın dışına iter.</summary>
     double Clear(double x, double y)
     {
-        if (Avoid is not { } a || y < a.T || y > a.B || x < a.L || x > a.R) return x;
-        double left = a.L - 12, right = a.R + 12;
-        bool goLeft = (x - a.L < a.R - x && left > MinX) || right > MaxX;
-        return Math.Clamp(goLeft ? left : right, MinX, MaxX);
+        // Düğme alanı ve engeller (gölet suyu, ağaç gövdesi, kayalar, çalılar): birkaç kez it, iç içe engellerde de çıkar.
+        for (int pass = 0; pass < 3; pass++)
+        {
+            bool moved = false;
+            foreach (var a in Avoid is { } av ? Blocks.Append(av) : Blocks)
+            {
+                if (y < a.T || y > a.B || x < a.L || x > a.R) continue;
+                double left = a.L - 12, right = a.R + 12;
+                bool goLeft = (x - a.L < a.R - x && left > MinX) || right > MaxX;
+                x = Math.Clamp(goLeft ? left : right, MinX, MaxX);
+                moved = true;
+            }
+            if (!moved) break;
+        }
+        return x;
     }
+
+    /// <summary>Hayvanların ayak basmadığı yerler (sahne kurar): gölet, ağaç gövdesi, kaya, çalı.</summary>
+    public readonly List<(double L, double T, double R, double B)> Blocks = new();
+    /// <summary>Gölet (ortası ve yatay yarıçapı) ve ağaç gölgesi (gövdenin dibi). Sahne kurar; yoksa null.</summary>
+    public (double X, double Y, double Rx)? Pond;
+    public (double X, double Y)? Shade;
+    /// <summary>Gezginin çalışırken yürüdüğü patika: x → y. Sahne kurar.</summary>
+    public Func<double, double>? PathY;
+    public bool Noon;                     // öğle sıcağı: gölgeye daha çok giderler
+    public double Top => MinY;
+    public double Bottom => MaxY;
     readonly Random rng = new();
 
     double MinX => Sprite * 0.5;
@@ -172,8 +198,9 @@ public sealed class ZooWorld
                 {
                     double reach = KeeperWalking ? Rand(120, 320) : Rand(40, 110);
                     double dir = k.X > Width * 0.7 ? -1 : k.X < Width * 0.3 ? 1 : (rng.Next(2) == 0 ? -1 : 1);
-                    k.TargetY = Math.Clamp(k.Y + Rand(-30, 30), MinY + 10, MaxY);
-                    k.TargetX = Clear(Math.Clamp(k.X + dir * reach, MinX + 30, MaxX - 30), k.TargetY);
+                    double tx = Math.Clamp(k.X + dir * reach, MinX + 30, MaxX - 30);
+                    k.TargetY = KeeperWalking && PathY != null ? Math.Clamp(PathY(tx), MinY, MaxY) : Math.Clamp(k.Y + Rand(-30, 30), MinY + 10, MaxY);
+                    k.TargetX = KeeperWalking && PathY != null ? tx : Clear(tx, k.TargetY);
                     k.State = WanderState.Walk;
                 }
                 else k.Timer = Rand(3, 7);
@@ -258,6 +285,22 @@ public sealed class ZooWorld
     /// <summary>Yürüyüş bitince ne yapacağını seçer: ayakta bekler, oturur, bir şeyler yer ya da uyur.</summary>
     void Rest(Wanderer w)
     {
+        if (w.Intent == ZooSpotKind.Pond && Pond is { } p)
+        {
+            w.Intent = ZooSpotKind.None;
+            w.FacingRight = w.X < p.X;
+            w.Pose = w.Has[(int)ZooPose.Eat] ? ZooPose.Eat : ZooPose.Stand;          // başı eğik: su içiyor
+            w.Timer = Rand(4, 8);
+            return;
+        }
+        if (w.Intent == ZooSpotKind.Shade)
+        {
+            w.Intent = ZooSpotKind.None;
+            var shadePose = rng.NextDouble() < 0.6 ? ZooPose.Sit : ZooPose.Sleep;
+            w.Pose = w.Has[(int)shadePose] ? shadePose : ZooPose.Stand;
+            w.Timer = Rand(10, 22);
+            return;
+        }
         double r = rng.NextDouble();
         var (pose, min, max) = Mood == ZooMood.Play
                 ? (r < 0.75 ? (ZooPose.Stand, 0.6, 2.0) : (ZooPose.Happy, 1.0, 2.0))          // molada: kıpır kıpır
@@ -312,6 +355,25 @@ public sealed class ZooWorld
             double behind = parent.FacingRight ? -1 : 1;
             Aim(w, () => (parent.X + behind * Rand(48, 72), parent.Y + Rand(4, 18)));
             return;
+        }
+        // Su içmeye göle, dinlenmeye ağaç gölgesine gider.
+        w.Intent = ZooSpotKind.None;
+        if (Mood != ZooMood.Play && w.Follow == null)
+        {
+            double r = rng.NextDouble();
+            if (Pond is { } p && r < 0.16)
+            {
+                double side = w.X < p.X ? -1 : 1;
+                w.Intent = ZooSpotKind.Pond;
+                Aim(w, () => (p.X + side * (p.Rx + Rand(20, 34)), p.Y + Rand(-2, 10)));
+                return;
+            }
+            if (Shade is { } sh && r < 0.16 + (Noon ? 0.30 : 0.12))
+            {
+                w.Intent = ZooSpotKind.Shade;
+                Aim(w, () => (sh.X + Rand(-90, 90), sh.Y + Rand(4, 22)));
+                return;
+            }
         }
         // Ara sıra bir arkadaşının yanına gider; böylece karşılaşmalar kendiliğinden olur.
         var others = Animals.Where(o => o != w && !o.Arriving && !double.IsNaN(o.X)).ToList();
