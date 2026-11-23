@@ -1,6 +1,8 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Shapes;
 
 namespace FlowState;
 
@@ -14,11 +16,31 @@ public partial class ConfirmDialog : Window
         MessageText.Text = message;
         OkBtn.Content = okText;
 
-        var tone = (Color)ColorConverter.ConvertFromString(danger ? "#E58A8A" : "#7C9CFF");
-        IconBg.Fill = new SolidColorBrush(Color.FromArgb(0x33, tone.R, tone.G, tone.B));
-        IconText.Foreground = new SolidColorBrush(tone);
-        IconText.Text = danger ? "!" : "i";
-        OkBtn.Background = new SolidColorBrush(danger ? Color.FromRgb(0xE5, 0x8A, 0x8A) : tone);
+        if (danger)
+        {
+            // Tehlikeli işlem: pembe rozet, dolu kırmızı onay düğmesi
+            IconBg.Fill = (Brush)FindResource("DangerSoft");
+            IconPath.Stroke = (Brush)FindResource("Danger");
+            OkBtn.Background = (Brush)FindResource("Danger");
+            OkBtn.Foreground = Brushes.White;
+        }
+        else
+        {
+            // Bilgi / onay: tema renginde rozet ve Primary düğme
+            IconBg.SetResourceReference(Shape.FillProperty, "AccentSoft");
+            IconPath.SetResourceReference(Shape.StrokeProperty, "Accent");
+            IconPath.Data = Geometry.Parse("M12,6.1 L12,6.2 M12,10.5 L12,18");
+        }
+
+        // Açılışta küçük bir "pıt": kart hafifçe büyüyerek belirir
+        Loaded += (_, _) =>
+        {
+            var ease = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.45 };
+            var a = new DoubleAnimation(0.9, 1, TimeSpan.FromSeconds(0.3)) { EasingFunction = ease };
+            PopScale.BeginAnimation(ScaleTransform.ScaleXProperty, a);
+            PopScale.BeginAnimation(ScaleTransform.ScaleYProperty, a);
+            CardBox.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromSeconds(0.2)));
+        };
 
         if (cancelText == null) CancelBtn.Visibility = Visibility.Collapsed;
         else CancelBtn.Content = cancelText;
