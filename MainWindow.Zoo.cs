@@ -70,7 +70,7 @@ public partial class MainWindow
         }
 
         // Düzen yalnızca ekran, sahip olunanlar ya da (markette) alınabilir hayvan sayısı değişince yeniden kurulur.
-        var key = $"{zooScreen}|{data.OwnedAnimals.Count}|{(zooScreen == ZooScreen.Shop ? affordable : 0)}";
+        var key = $"{zooScreen}|{data.OwnedAnimals.Count}|{Specials().Count}|{(zooScreen == ZooScreen.Shop ? affordable : 0)}";
         if (key == zooKey) return;
         zooKey = key;
 
@@ -135,14 +135,23 @@ public partial class MainWindow
         canvas.SizeChanged += (_, e) => { zooWorld.Width = e.NewSize.Width; zooWorld.Height = e.NewSize.Height; };
         zooCanvas = canvas;
 
-        // Dünyayı sahip olunanlarla eşitle; konumlar ekran yeniden kurulsa da korunur.
+        // Dünyayı sahip olunanlar + nadir dostlarla eşitle; konumlar ekran yeniden kurulsa da korunur.
         string? arriving = zooArriving;
         zooArriving = null;
-        zooWorld.Animals.RemoveAll(w => owned.All(a => a.Id != w.Id));
+        var specials = ZooDemo ? new List<Special>() : Specials().Where(x => owned.Any(a => a.Id == x.AnimalId)).ToList();
+        var keys = owned.Select(a => a.Id).Concat(specials.Select(x => x.Key)).ToHashSet();
+        zooWorld.Animals.RemoveAll(w => !keys.Contains(w.Id));
         foreach (var a in owned)
         {
             var w = zooWorld.Animals.FirstOrDefault(x => x.Id == a.Id) ?? zooWorld.Add(a.Id, arriving: a.Id == arriving);
-            AddNode(canvas, a, w);
+            AddNode(canvas, a, w, null);
+        }
+        foreach (var sp in specials)
+        {
+            var a = ZooCatalog.Find(sp.AnimalId)!;
+            var w = zooWorld.Animals.FirstOrDefault(x => x.Id == sp.Key) ?? zooWorld.Add(sp.Key, arriving: sp.Key == arriving);
+            if (sp.Kind == SpecialKind.Baby) w.Follow = zooWorld.Animals.FirstOrDefault(x => x.Id == sp.AnimalId);
+            AddNode(canvas, a, w, sp.Kind);
         }
         EnsureZooTimer();
 
@@ -153,6 +162,7 @@ public partial class MainWindow
             tip.Margin = new Thickness(0, 14, 0, 0);
             TextElement_SetForeground(tip, Res("Muted"));
             ZooRoot.Children.Add(tip);
+            ZooRoot.Children.Add(CollectionCard());
         }
 
         // Henüz alınmamışlar: sahnenin altında, pastel kürsülerde siluet olarak (merak uyandırsın).
@@ -412,13 +422,16 @@ public partial class MainWindow
     /// <summary>Bir hayvanın sahnedeki görseli: gölge + sprite + üstünde isim etiketi (beyaz hap, altında küçük kuyruk).</summary>
     sealed record ZooNode(Wanderer W, Canvas Root, Image Img, ScaleTransform Flip, TranslateTransform Hop,
                           FrameworkElement Bubble, Border BubbleFace, Path BubbleTail, TextBlock BubbleText, Path Heart,
-                          BitmapSource[] Frames, BitmapSource?[] Poses, string Name);
+                          BitmapSource[] Frames, BitmapSource?[] Poses, string Name, double Scale);
 
-    void AddNode(Canvas canvas, Animal a, Wanderer w)
+    /// <param name="kind">null: hayvanın kendisi; Golden: altına boyalı ve parıltılı; Baby: küçük, annesini izler.</param>
+    void AddNode(Canvas canvas, Animal a, Wanderer w, SpecialKind? kind)
     {
         const double S = ZooWorld.Sprite;
-        var frames = Frames(a.Id);
-        var poses = Poses(a.Id);
+        bool golden = kind == SpecialKind.Golden;
+        double scale = kind == SpecialKind.Baby ? BabyScale : 1;
+        var frames = golden ? GoldenFrames(a.Id) : Frames(a.Id);
+        var poses = golden ? GoldenPoses(a.Id) : Poses(a.Id);
         w.Has = poses.Select(p => p != null).ToArray();
 
         var shadow = new Ellipse { Width = S * 0.62, Height = S * 0.16, Fill = new SolidColorBrush(Color.FromArgb(0x48, 0x2E, 0x5A, 0x1C)) };
@@ -457,12 +470,29 @@ public partial class MainWindow
         });
         bubble.Children.Add(stack);
 
+        // Gövde (gölge + sprite) yavruda ayakların altından küçültülür; etiket normal boyda kalır.
+        var body = new Canvas { Width = S, Height = S, RenderTransform = new ScaleTransform(scale, scale, S / 2, S) };
+        body.Children.Add(shadow);
+        body.Children.Add(img);
+        if (golden)
+        {
+            // Altın dostun çevresinde parıldayan iki yıldızcık.
+            foreach (var (x, y, d, delay) in new[] { (S * 0.16, S * 0.30, 12.0, 0.0), (S * 0.74, S * 0.18, 9.0, 0.7) })
+            {
+                var sc = new ScaleTransform(1, 1);
+                var spark = new Path { Data = (Geometry)FindResource("IconSparkle"), Fill = Res("Coin"), Width = d, Height = d, Stretch = Stretch.Uniform,
+                    IsHitTestVisible = false, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = sc };
+                Canvas.SetLeft(spark, x); Canvas.SetTop(spark, y);
+                body.Children.Add(spark);
+                Twinkle(spark, sc, delay);
+            }
+        }
         var root = new Canvas { Width = S, Height = S };
-        root.Children.Add(shadow);
-        root.Children.Add(img);
+        root.Children.Add(body);
         root.Children.Add(bubble);
         canvas.Children.Add(root);
-        zooNodes.Add(new ZooNode(w, root, img, flip, hop, bubble, face, tail, text, heart, frames, poses, a.Name));
+        string name = kind is { } k ? Special.Title(a.Name, k) : a.Name;
+        zooNodes.Add(new ZooNode(w, root, img, flip, hop, bubble, face, tail, text, heart, frames, poses, name, scale));
     }
 
     void EnsureZooTimer()
@@ -480,6 +510,7 @@ public partial class MainWindow
         double dt = zooClock.IsRunning ? zooClock.Elapsed.TotalSeconds : 0;
         zooClock.Restart();
         zooWorld.Update(dt);
+        TickVisitor();
 
         const double S = ZooWorld.Sprite;
         foreach (var n in zooNodes)
@@ -528,7 +559,7 @@ public partial class MainWindow
             }
             n.Bubble.Visibility = Visibility.Visible;
             Canvas.SetLeft(n.Bubble, Math.Round((S - n.Bubble.DesiredSize.Width) / 2));
-            Canvas.SetTop(n.Bubble, -4 + n.Hop.Y);
+            Canvas.SetTop(n.Bubble, -4 + S * (1 - n.Scale) + n.Hop.Y * n.Scale);
         }
     }
 

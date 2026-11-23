@@ -14,6 +14,8 @@ Geliştirme için: masaüstünde `dist\FlowState.exe` (.NET 9 Desktop Runtime ge
 - Ders ekle/sil, "Genel" ders, başlat / duraklat / bitir, Boşluk tuşu kısayolu
 - **Kronometre / Geri sayım:** seçici başlat/bitir düğmelerinin üstünde, oturum başlayınca gizlenir. Geri sayım'a tıklayınca süre kadranı açılır: tutamaç çevrilerek (tam tur 2 saat, 5 dk adım), fare tekerleği, ok tuşları ya da hızlı seçimlerle süre seçilir; "Başla" oturumu hemen başlatır. Çember tüm süreyi bir turda doldurur, süre dolunca oturum sesle kendiliğinden biter.
 - **Jeton:** oturum sürerken birikmez, oturum bitince tek seferde eklenir; "+N jeton" kartı ve Bahçe sekmesine uçan jetonlarla gösterilir.
+- **Gezgin ziyareti:** oturum bitince gezgin bahçeye gelir; hayvanlar (uyuyanlar uyanarak) etrafına toplanıp selamlar, gezgin bir süre kalıp sağdan çıkar.
+- **Nadir dostlar:** uzun oturumlar (45 dk+) küçük bir şansla sahip olduğun bir hayvanın altın ya da yavru hâlini getirir (ödül kartında "Sürpriz!"). Altınlar parıldar, yavrular annesinin peşinden gider. Bahçede 10 kutulu koleksiyon kartı. Jeton gibi seanslardan hesaplanır; ayrıca senkron gerekmez.
 - **İstatistik:** bugün / hafta / ay / toplam süre, seri (güncel / en uzun / çalışılan gün), döneme göre ders dağılımı, son 14 gün grafiği, 18 haftalık ısı haritası
 - **Geçmiş:** oturum listesi, tek tek silme, CSV (Excel) dışa aktarma
 - **Widget modu (masaüstü):** küçük, üstte kalan, sürüklenebilir pencere; halkaya tıkla başlat/duraklat

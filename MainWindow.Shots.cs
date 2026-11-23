@@ -87,7 +87,11 @@ public partial class MainWindow
         NavHistory.IsChecked = true;
         await Shot("04-gecmis", 1000, HistoryPanel);
         NavZoo.IsChecked = true;
-        await Shot("05-bahce", 3500);
+        await Shot("05-bahce", 3500, ZooView);
+        // Gezgin ziyareti: girerken ve hayvanlar onu karşılarken.
+        explorerVisitPending = true;
+        await Shot("05b-gezgin-geliyor", 3500);
+        await Shot("05c-gezgin-karsilama", 7000);
         GoZoo(ZooScreen.Shop);
         await Shot("06-market", 1500, ZooView);
         zooBoughtId = "rhino";
@@ -115,7 +119,11 @@ public partial class MainWindow
         Commit();
         UpdateAll();
         await Task.Delay(800);
-        ShowCoinReward(new Session { Id = "shot-reward", CourseId = SelectedCourse?.Id ?? Course.GeneralId, Start = DateTime.Now.AddMinutes(-95), Seconds = 5400 }, false);
+        // Örnek veride nadir dost getirmiş bir seans varsa ödül kartında "Sürpriz!" de görünsün.
+        var sp = Specials().LastOrDefault();
+        var rs = sp != null ? data.Sessions.First(x => x.Id == sp.SessionId)
+            : new Session { Id = "shot-reward", CourseId = SelectedCourse?.Id ?? Course.GeneralId, Start = DateTime.Now.AddMinutes(-95), Seconds = 5400 };
+        ShowCoinReward(rs, false, sp);
         await Shot("12-jeton", 650);
         await Shot("13-jeton-ucus", 900);
         await Task.Delay(3000);

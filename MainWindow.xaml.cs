@@ -360,8 +360,15 @@ public partial class MainWindow : Window
     void FinishSession(bool timeUp)
     {
         var done = Commit();
+        Special? special = null;
+        if (done != null)
+        {
+            explorerVisitPending = true;                       // gezgin bahçeye doğru yola çıkar
+            special = ZooSpecials.From(data, done);
+            if (special != null) zooArriving = special.Key;    // nadir dost bahçeye yürüyerek girer
+        }
         UpdateAll();
-        if (done != null) ShowCoinReward(done, timeUp);
+        if (done != null) ShowCoinReward(done, timeUp, special);
     }
 
     /// <summary>Süren oturumu kaydeder. Kaydedilen oturumu (5 sn'den kısaysa null) döndürür.</summary>

@@ -14,14 +14,14 @@ public partial class MainWindow
     static readonly Brush CoinText = new SolidColorBrush(Color.FromRgb(0xC9, 0x84, 0x10));
     readonly Random fxRnd = new();
 
-    void ShowCoinReward(Session s, bool timeUp)
+    void ShowCoinReward(Session s, bool timeUp, Special? special = null)
     {
         int coins = Zoo.SessionCoins(s);
         var course = data.Courses.FirstOrDefault(c => c.Id == s.CourseId)?.Name ?? "";
         FxLayer.UpdateLayout();
         var center = RewardOrigin();
 
-        var card = RewardCard(coins, timeUp, $"{course} · {Fmt(s.Seconds)}", out var count);
+        var card = RewardCard(coins, timeUp, $"{course} · {Fmt(s.Seconds)}", special, out var count);
         double zoom = widgetMode ? 0.62 : 1;
         var scale = new ScaleTransform(0.4 * zoom, 0.4 * zoom);
         card.RenderTransformOrigin = new Point(0.5, 0.5);
@@ -42,7 +42,7 @@ public partial class MainWindow
         if (coins > 0) BurstCoins(center, Math.Clamp(coins, 3, 14), coins);
 
         // Kapanış: biraz bekler, küçülerek kaybolur.
-        var hold = TimeSpan.FromSeconds(coins > 0 ? 3.0 : 2.4);
+        var hold = TimeSpan.FromSeconds(special != null ? 4.8 : coins > 0 ? 3.2 : 2.6);
         After(hold, () =>
         {
             var shrink = new DoubleAnimation(zoom, 0.85 * zoom, TimeSpan.FromSeconds(0.3)) { EasingFunction = new SineEase() };
@@ -62,7 +62,7 @@ public partial class MainWindow
         return new Point(FxLayer.ActualWidth / 2, FxLayer.ActualHeight / 2);
     }
 
-    FrameworkElement RewardCard(int coins, bool timeUp, string summary, out TextBlock? count)
+    FrameworkElement RewardCard(int coins, bool timeUp, string summary, Special? special, out TextBlock? count)
     {
         var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
 
@@ -101,6 +101,31 @@ public partial class MainWindow
             stack.Children.Add(Line("Biraz daha uzun odaklan, jetonlar gelsin.", 13, FontWeights.SemiBold, "Muted", 4));
         }
         stack.Children.Add(Line(summary, 13, FontWeights.Bold, "Muted", 6));
+
+        if (special != null && ZooCatalog.Find(special.AnimalId) is { } animal)
+        {
+            // Sürpriz: nadir dost bahçeye katıldı.
+            stack.Children.Add(new Border { Height = 2, CornerRadius = new CornerRadius(1), Margin = new Thickness(0, 14, 0, 12), Background = Res("Line") });
+            var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+            var stand = new Grid { Width = 64, Height = 64 };
+            stand.Children.Add(new System.Windows.Shapes.Ellipse { Width = 60, Height = 60, Fill = Res(special.Kind == SpecialKind.Golden ? "WarnSoft" : "AccentSoft") });
+            stand.Children.Add(SpecialImage(animal.Id, special.Kind, 56, locked: false));
+            row.Children.Add(stand);
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+            var tag = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 2, 9, 3), HorizontalAlignment = HorizontalAlignment.Left, Background = Res("WarnSoft"),
+                Child = new TextBlock { Text = "Sürpriz!", FontSize = 12, FontWeight = FontWeights.Black, Foreground = CoinText } };
+            text.Children.Add(tag);
+            var name = new TextBlock { Text = Special.Title(animal.Name, special.Kind), FontSize = 17, FontWeight = FontWeights.Black, Margin = new Thickness(0, 4, 0, 0) };
+            name.SetResourceReference(TextBlock.ForegroundProperty, "Text");
+            text.Children.Add(name);
+            var sub = new TextBlock { Text = "bahçene katıldı", FontSize = 13, FontWeight = FontWeights.Bold };
+            sub.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+            text.Children.Add(sub);
+            row.Children.Add(text);
+            stack.Children.Add(row);
+        }
+        else if (data.OwnedAnimals.Count > 0)
+            stack.Children.Add(Line("Gezgin bahçeye doğru yola çıktı", 12.5, FontWeights.Bold, "Muted", 10));
 
         var card = new Border
         {
