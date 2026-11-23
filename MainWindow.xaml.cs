@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     {
         if (ShotMode) { Store.ReadOnly = true; SeedSample(); } // ekran görüntüsü modu: örnek veri, diske yazma yok
         InitializeComponent();
+        RingHost.LayoutTransform = NormalRingScale;
 
         // Önceki çalışma çökme/kapanma ile yarım kaldıysa kaydet.
         if (data.Active is { } a)
@@ -1140,6 +1141,9 @@ public partial class MainWindow : Window
     // ---------- widget modu ----------
 
     bool widgetMode;
+
+    // Büyük pencerede çember biraz küçültülür ki düğmeler varsayılan boyda kaydırmadan görünsün.
+    static readonly ScaleTransform NormalRingScale = new(0.88, 0.88);
     Rect normalBounds;
     double normalMinW, normalMinH;
     Rect widgetBounds = Rect.Empty;
@@ -1174,6 +1178,7 @@ public partial class MainWindow : Window
             PipsLabel.Visibility = Visibility.Collapsed;
             TimerPanel.Margin = new Thickness(0);
             RingHost.Margin = new Thickness(0);
+            RingHost.LayoutTransform = Transform.Identity;
             BtnRow.Margin = new Thickness(0, 6, 0, 0);
             StartBtn.Width = StartBtn.Height = 60;
             FinishBtn.Width = FinishBtn.Height = 50;
@@ -1220,14 +1225,15 @@ public partial class MainWindow : Window
             HourPips.Visibility = Visibility.Visible;
             PipsLabel.Visibility = Visibility.Visible;
             TimerPanel.Margin = new Thickness(24, 12, 24, 28);
-            RingHost.Margin = new Thickness(0, 18, 0, 0);
-            BtnRow.Margin = new Thickness(0, 20, 0, 0);
+            RingHost.Margin = new Thickness(0, 10, 0, 0);
+            RingHost.LayoutTransform = NormalRingScale;
+            BtnRow.Margin = new Thickness(0, 14, 0, 0);
             StartBtn.Width = StartBtn.Height = 92;
             FinishBtn.Width = FinishBtn.Height = 72;
             TimerCourseName.FontSize = 22;
             TimerStatus.FontSize = 13;
-            ElapsedText.FontSize = 46;
-            ElapsedText.Margin = new Thickness(0, 16, 0, 0);
+            ElapsedText.FontSize = 42;
+            ElapsedText.Margin = new Thickness(0, 6, 0, 0);
             TimerPanel.LayoutTransform = Transform.Identity;
 
             Left = normalBounds.X; Top = normalBounds.Y;

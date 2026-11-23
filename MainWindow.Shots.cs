@@ -49,10 +49,10 @@ public partial class MainWindow
 
         foreach (var id in new[] { "zebra", "giraffe", "lion" })
             data.OwnedAnimals.Add(new OwnedAnimal { AnimalId = id, Price = ZooCatalog.Find(id)!.Price });
-        // Market'te hem alınabilen (gergedan, 80) hem kilitli (fil, 120) kart görünsün: bakiye 80..119.
-        while (Zoo.Balance(data) >= 120 && data.Sessions.Count > 2) data.Sessions.RemoveAt(0);
-        while (Zoo.Balance(data) < 80)
-            data.Sessions.Insert(0, new Session { CourseId = courses[2].Id, Start = Today.AddDays(-126), Seconds = 1800 });
+        // Market'te hem alınabilen (gergedan, 80) hem kilitli (fil, 120) kart görünsün: bakiye ~100.
+        // Oturumlara dokunmadan aslanın "ödenen" fiyatı ayarlanır (yalnızca örnek veri).
+        var lion = data.OwnedAnimals.Last();
+        lion.Price = Math.Max(lion.Price, lion.Price + Zoo.Balance(data) - 100);
     }
 
     async Task TakeShots()
@@ -103,7 +103,7 @@ public partial class MainWindow
         var dlg = ConfirmDialog.Preview(this, "Oturumu sil", "Bu çalışma kaydı silinecek. Bu işlem geri alınamaz.", "Sil", true);
         dlg.Show();
         await Task.Delay(900);
-        Save(dlg, (FrameworkElement)dlg.Content, Brushes.Transparent, "10-onay");
+        SaveFull((FrameworkElement)dlg.Content, Background, "10-onay");
         dlg.Close();
 
         NavTimer.IsChecked = true;
@@ -119,7 +119,33 @@ public partial class MainWindow
         Save(this, (FrameworkElement)Content, Background, name);
         if (full == null) return;
         var inner = full is ScrollViewer sv ? sv.Content as FrameworkElement ?? full : full;
-        Save(this, inner, Background, name + "-tam", 28);
+        SaveFull(inner, Background, name + "-tam");
+    }
+
+    /// <summary>Öğeyi, taşan gölgeleri dahil tüm çizim sınırıyla kaydeder (kaydırma alanının tam boyu için).</summary>
+    static void SaveFull(FrameworkElement el, Brush bg, string name)
+    {
+        const double scale = 1.5, pad = 24;
+        var b = VisualTreeHelper.GetDescendantBounds(el);
+        if (b.IsEmpty || b.Width < 2 || b.Height < 2) return;
+        double cw = Math.Ceiling(b.Width + pad * 2), ch = Math.Ceiling(b.Height + pad * 2);
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.DrawRectangle(bg ?? Brushes.White, null, new Rect(0, 0, cw, ch));
+            dc.DrawRectangle(new VisualBrush(el) { Stretch = Stretch.Fill }, null, new Rect(pad, pad, b.Width, b.Height));
+        }
+        Write(dv, cw, ch, scale, name);
+    }
+
+    static void Write(DrawingVisual dv, double cw, double ch, double scale, string name)
+    {
+        var rtb = new RenderTargetBitmap((int)(cw * scale), (int)(ch * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+        rtb.Render(dv);
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(rtb));
+        using var fs = File.Create(Path.Combine(ShotsDir!, name + ".png"));
+        enc.Save(fs);
     }
 
     static void Save(Window w, FrameworkElement el, Brush bg, string name, double pad = 0)

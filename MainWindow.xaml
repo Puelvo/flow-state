@@ -160,7 +160,7 @@
 
         <!-- Çalışma görünümü: ders chip'leri, beyaz bir disk üstünde ilerleme çemberi, büyük süre, saat yıldızları, şeker düğmeler -->
         <ScrollViewer x:Name="TimerView" Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="TimerPanel" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24,12,24,28" MaxWidth="760">
+            <StackPanel x:Name="TimerPanel" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24,4,24,20" MaxWidth="760">
 
                 <TextBlock x:Name="TimerHello" Text="Bugün neye odaklanıyoruz?" Style="{StaticResource PageSub}"
                            HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,8"/>
@@ -203,7 +203,7 @@
                     Çember: beyaz, gölgeli bir disk; üstünde yumuşak iz halkası ve tema renginde kalın ilerleme yayı (RingArc, kodda çizilir).
                     Ortada dersin renginde pastel bir yüz (RingFace) var; oturum sürerken yavaşça "nefes alır".
                 -->
-                <Grid x:Name="RingHost" Width="320" Height="320" Margin="0,18,0,0" HorizontalAlignment="Center"
+                <Grid x:Name="RingHost" Width="320" Height="320" Margin="0,10,0,0" HorizontalAlignment="Center"
                       Background="Transparent" Cursor="Hand" ToolTip="Başlat / duraklat"
                       PreviewMouseLeftButtonDown="Ring_Down" MouseMove="Ring_Move" MouseLeftButtonUp="Ring_Up">
                     <Ellipse Fill="{StaticResource Surface}" Effect="{StaticResource SoftShadow}"/>
@@ -237,15 +237,15 @@
                 </Grid>
 
                 <!-- Çalışma süresi (çemberin altında): büyük ve kalın -->
-                <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="46" FontWeight="Black" Foreground="{StaticResource Text}"
-                           Typography.NumeralAlignment="Tabular" HorizontalAlignment="Center" Margin="0,16,0,0"/>
+                <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="42" FontWeight="Black" Foreground="{StaticResource Text}"
+                           Typography.NumeralAlignment="Tabular" HorizontalAlignment="Center" Margin="0,6,0,0"/>
 
                 <!-- Tamamlanan saatler: her saat için altın bir yıldızcık, süren saat için boş yıldız -->
                 <StackPanel x:Name="HourPips" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0" Height="18"/>
                 <TextBlock x:Name="PipsLabel" Foreground="{StaticResource Muted}" FontSize="14" FontWeight="Bold"
                            HorizontalAlignment="Center" Margin="0,6,0,0"/>
 
-                <StackPanel x:Name="BtnRow" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+                <StackPanel x:Name="BtnRow" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,14,0,0">
                     <Button x:Name="StartBtn" Style="{StaticResource Round}" Width="92" Height="92" VerticalAlignment="Center"
                             Background="{DynamicResource Accent}" Foreground="{DynamicResource OnAccent}" Margin="0,0,18,0"
                             ToolTip="Başlat / duraklat (Boşluk)" Click="StartBtn_Click"/>
