@@ -1,10 +1,12 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="456" height="456" viewBox="0 0 456 456" version="1.1" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#34195E"/>
-      <stop offset="1" stop-color="#170A2E"/>
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="456" height="456" fill="url(#bg)" />
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><defs>
+ <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#78BFFF"/><stop offset="0.62" stop-color="#D6EFFF"/><stop offset="1" stop-color="#FFE6BC"/></linearGradient>
+ <radialGradient id="sun" cx="0.42" cy="0.38" r="0.7">
+  <stop offset="0" stop-color="#FFF8D2"/><stop offset="0.55" stop-color="#FFE07A"/><stop offset="1" stop-color="#FFC23E"/></radialGradient>
+ <linearGradient id="ray" x1="0" y1="0" x2="1" y2="1">
+  <stop offset="0" stop-color="#FFC233"/><stop offset="1" stop-color="#FF7A5C"/></linearGradient>
+ <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+  <stop offset="0.55" stop-color="#FFF4C2" stop-opacity="0.9"/><stop offset="1" stop-color="#FFF4C2" stop-opacity="0"/></radialGradient>
+</defs><rect x="0" y="0" width="512" height="512" fill="url(#sky)"/><path d="M0 392 C 90 350, 170 360, 250 388 C 330 414, 420 352, 512 372 L512 512 L0 512 Z" fill="#CBE8B0"/>
+<path d="M0 430 C 110 398, 210 412, 300 432 C 390 452, 450 420, 512 424 L512 512 L0 512 Z" fill="#8DC963"/>
+<path d="M0 430 C 110 398, 210 412, 300 432 C 390 452, 450 420, 512 424" fill="none" stroke="#A9DB7E" stroke-width="6"/></svg>

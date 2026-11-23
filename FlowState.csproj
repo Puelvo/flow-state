@@ -30,6 +30,7 @@
     <Resource Include="Assets\pixellab\*.png" />
     <Resource Include="Assets/explorer/*.png" />
     <Resource Include="Assets/fonts/*.ttf" />
+    <Resource Include="Assets/logo.png" />
   </ItemGroup>
 
 </Project>
