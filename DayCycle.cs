@@ -19,7 +19,7 @@ public readonly record struct SkyPalette(
 public static class DayCycle
 {
     public static readonly SkyPalette Night = new(
-        0xFF10163A, 0xFF2C3770, 0x6B1A2350, 0xFFC9D3FF, 0xFFF6F4FF, 0xFFD5DAF2, 0x55C9D3FF, 1, 1, 0.25, 1);
+        0xFF10163A, 0xFF2C3770, 0x6B1A2350, 0xFFC9D3FF, 0xFFF3F1EA, 0xFFD3D1C9, 0x55C9D3FF, 1, 1, 0.25, 1);
     public static readonly SkyPalette Dawn = new(
         0xFF8FA8E8, 0xFFFFC6B4, 0x1FFF9C8A, 0xFFFF8FA3, 0xFFFFF2D8, 0xFFFFC796, 0x66FFB8A0, 0.25, 0, 0.9, 0);
     public static readonly SkyPalette Day = new(

@@ -86,6 +86,7 @@ public partial class MainWindow
         PipsBar.SizeChanged += (_, _) => LayoutScene();
         BottomRow.SizeChanged += (_, _) => LayoutScene();
         TopRow.SizeChanged += (_, _) => LayoutScene();
+        BuildMoon();
         ApplySunPalette(force: true);
         EnsureZooTimer();
     }
