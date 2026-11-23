@@ -39,9 +39,8 @@ public partial class MainWindow : Window
         if (ShotMode) { Store.ReadOnly = true; SeedSample(); } // ekran görüntüsü modu: örnek veri, diske yazma yok
         InitializeComponent();
         RingHost.LayoutTransform = NormalRingScale;
-        data.CountdownMinutes = Math.Clamp(data.CountdownMinutes, 5, 180);
+        data.CountdownMinutes = Math.Clamp(data.CountdownMinutes, DialMin, DialMax);
         if (data.Countdown) ModeCountdown.IsChecked = true;
-        DurationPopup.CustomPopupPlacementCallback = PlaceDurationPopup;
 
         // Önceki çalışma çökme/kapanma ile yarım kaldıysa kaydet.
         if (data.Active is { } a)
@@ -723,9 +722,8 @@ public partial class MainWindow : Window
             : Clock(es);
         // Mod seçici yalnızca oturum yokken görünür; widget'ta hiç yok.
         ModePanel.Visibility = widgetMode || active ? Visibility.Collapsed : Visibility.Visible;
-        if (active) DurationPopup.IsOpen = false;
+        if (active) CloseDial();
         CountdownLabel.Text = data.Countdown ? $"Geri sayım · {data.CountdownMinutes} dk" : "Geri sayım";
-        DurationText.Text = $"{data.CountdownMinutes} dk";
         ElapsedText.Opacity = !active ? 0.4 : sw.IsRunning ? 1 : 0.6;
 
         UpdateRing();
@@ -1191,65 +1189,17 @@ public partial class MainWindow : Window
     void Mode_Checked(object sender, RoutedEventArgs e)
     {
         if (!ready) return;
+        if (ModeCountdown.IsChecked == true && !data.Countdown) countdownJustChecked = true;
         data.Countdown = ModeCountdown.IsChecked == true;
         Store.Save(data);
         UpdateAll();
     }
 
-    void Duration_Click(object sender, RoutedEventArgs e)
-        => ChangeDuration(int.Parse((string)((FrameworkElement)sender).Tag));
-
-    void Duration_Wheel(object sender, MouseWheelEventArgs e)
-    {
-        ChangeDuration(e.Delta > 0 ? 5 : -5);
-        e.Handled = true;
-    }
-
-    void ChangeDuration(int delta) => SetDuration(data.CountdownMinutes + delta);
-
-    void SetDuration(int minutes)
-    {
-        if (active) return;
-        data.CountdownMinutes = Math.Clamp(minutes, 5, 180);
-        Store.Save(data);
-        BuildDurationPresets();
-        UpdateAll();
-    }
-
-    static readonly int[] DurationChoices = { 15, 25, 30, 45, 60, 90, 120 };
-
-    // Geri sayım'a her tıklamada (zaten seçiliyken de) süre menüsü açılır.
+    // Geri sayım'a her tıklamada (zaten seçiliyken de) süre kadranı açılır.
     void ModeCountdown_Click(object sender, RoutedEventArgs e)
     {
-        if (active) return;
-        BuildDurationPresets();
-        DurationPopup.IsOpen = true;
+        if (!active) OpenDial();
     }
-
-    void DurationDone_Click(object sender, RoutedEventArgs e) => DurationPopup.IsOpen = false;
-
-    // Hazır süreler: seçili olan tema renginde. Birine tıklamak süreyi seçer ve menüyü kapatır.
-    void BuildDurationPresets()
-    {
-        DurationPresets.Children.Clear();
-        foreach (var m in DurationChoices)
-        {
-            bool sel = m == data.CountdownMinutes;
-            var b = new Button
-            {
-                Style = (Style)FindResource(sel ? "Primary" : "Btn"), Margin = new Thickness(4), Padding = new Thickness(0, 7, 0, 7),
-                Content = m >= 60 && m % 60 == 0 ? $"{m / 60} saat" : $"{m} dk"
-            };
-            int pick = m;
-            b.Click += (_, _) => { SetDuration(pick); DurationPopup.IsOpen = false; };
-            DurationPresets.Children.Add(b);
-        }
-    }
-
-    // Menü, mod seçicinin tam üstünde ve ortasında açılır.
-    System.Windows.Controls.Primitives.CustomPopupPlacement[] PlaceDurationPopup(Size popup, Size target, Point offset)
-        => new[] { new System.Windows.Controls.Primitives.CustomPopupPlacement(
-            new Point((target.Width - popup.Width) / 2, -popup.Height + 14), System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal) };
 
     // Büyük pencerede çember biraz küçültülür ki düğmeler varsayılan boyda kaydırmadan görünsün.
     static readonly ScaleTransform NormalRingScale = new(0.88, 0.88);
@@ -1622,6 +1572,7 @@ public partial class MainWindow : Window
 
     void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (DialOpen && DialKey(e.Key)) { e.Handled = true; return; }
         if (e.Key == Key.Escape && widgetMode)
         {
             SetWidgetMode(false);

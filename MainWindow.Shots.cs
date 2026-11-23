@@ -124,11 +124,10 @@ public partial class MainWindow
         ModeCountdown.IsChecked = true;
         data.CountdownMinutes = 45;
         UpdateAll();
-        BuildDurationPresets();
-        DurationPopup.IsOpen = true;
-        await Task.Delay(900);
-        SaveWithPopup("14-geri-sayim-menu", DurationPopup.Child as FrameworkElement);
-        DurationPopup.IsOpen = false;
+        OpenDial();
+        SetDial(45);
+        await Shot("14-geri-sayim-kadran", 900);
+        CloseDial();
         await Shot("14-geri-sayim", 600);
         data.CountdownRunId = "shot-cd"; data.CountdownSeconds = 45 * 60;
         ApplyLiveLocal(new LiveState
@@ -175,33 +174,6 @@ public partial class MainWindow
         enc.Frames.Add(BitmapFrame.Create(rtb));
         using var fs = File.Create(Path.Combine(ShotsDir!, name + ".png"));
         enc.Save(fs);
-    }
-
-    /// <summary>Pencereyi, açık bir Popup'ın içeriğini ekrandaki yerine çizerek kaydeder (Popup ayrı pencerededir).</summary>
-    void SaveWithPopup(string name, FrameworkElement? pop)
-    {
-        UpdateLayout();
-        var root = (FrameworkElement)Content;
-        double cw = Math.Ceiling(root.ActualWidth), ch = Math.Ceiling(root.ActualHeight);
-        var dv = new DrawingVisual();
-        using (var dc = dv.RenderOpen())
-        {
-            dc.DrawRectangle(Background ?? Brushes.White, null, new Rect(0, 0, cw, ch));
-            dc.DrawRectangle(new VisualBrush(root)
-            {
-                Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top,
-                ViewboxUnits = BrushMappingMode.Absolute, Viewbox = new Rect(0, 0, cw, ch),
-                ViewportUnits = BrushMappingMode.Absolute, Viewport = new Rect(0, 0, cw, ch)
-            }, null, new Rect(0, 0, cw, ch));
-            if (pop != null && pop.IsVisible)
-            {
-                var at = root.PointFromScreen(pop.PointToScreen(new Point(0, 0)));
-                var b = VisualTreeHelper.GetDescendantBounds(pop);
-                if (!b.IsEmpty)
-                    dc.DrawRectangle(new VisualBrush(pop) { Stretch = Stretch.Fill }, null, new Rect(at.X + b.X, at.Y + b.Y, b.Width, b.Height));
-            }
-        }
-        Write(dv, cw, ch, 1.5, name);
     }
 
     static void Save(Window w, FrameworkElement el, Brush bg, string name, double pad = 0)

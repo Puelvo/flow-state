@@ -12,7 +12,7 @@ Geliştirme için: masaüstünde `dist\FlowState.exe` (.NET 9 Desktop Runtime ge
 ## Özellikler
 - **Çalış:** Sayaç rakamı yok; çalıştıkça dolan bir çember var. Her saat çember 1 tur atar, tamamlanan saatler altta nokta olarak görünür. Çember dersin rengini alır (geçişli).
 - Ders ekle/sil, "Genel" ders, başlat / duraklat / bitir, Boşluk tuşu kısayolu
-- **Kronometre / Geri sayım:** seçici başlat/bitir düğmelerinin üstünde, oturum başlayınca gizlenir. Geri sayım'a tıklayınca süre menüsü açılır (15 dk–2 saat hazır süreler, özel süre −/+ ve fare tekerleği). Çember tüm süreyi bir turda doldurur, süre dolunca oturum sesle kendiliğinden biter. Mod ve süre cihazda saklanır.
+- **Kronometre / Geri sayım:** seçici başlat/bitir düğmelerinin üstünde, oturum başlayınca gizlenir. Geri sayım'a tıklayınca süre kadranı açılır: tutamaç çevrilerek (tam tur 2 saat, 5 dk adım), fare tekerleği, ok tuşları ya da hızlı seçimlerle süre seçilir; "Başla" oturumu hemen başlatır. Çember tüm süreyi bir turda doldurur, süre dolunca oturum sesle kendiliğinden biter.
 - **Jeton:** oturum sürerken birikmez, oturum bitince tek seferde eklenir; "+N jeton" kartı ve Bahçe sekmesine uçan jetonlarla gösterilir.
 - **İstatistik:** bugün / hafta / ay / toplam süre, seri (güncel / en uzun / çalışılan gün), döneme göre ders dağılımı, son 14 gün grafiği, 18 haftalık ısı haritası
 - **Geçmiş:** oturum listesi, tek tek silme, CSV (Excel) dışa aktarma
