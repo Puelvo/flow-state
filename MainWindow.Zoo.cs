@@ -156,6 +156,7 @@ public partial class MainWindow
         }
         ZooRoot.Children.Add(new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0, 20, 0, 0), Child = ownedBody });
         if (owned.Count > 0) ZooRoot.Children.Add(CollectionCard());
+        ZooRoot.Children.Add(DecorCard());
 
         // Henüz alınmamışlar: sahnenin altında, pastel kürsülerde siluet olarak (merak uyandırsın).
         var missing = ZooCatalog.InMap(ActiveMapId).Where(a => !Zoo.Owns(data, a.Id)).ToList();

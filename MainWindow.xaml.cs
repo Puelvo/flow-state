@@ -362,14 +362,16 @@ public partial class MainWindow : Window
     {
         var done = Commit();
         Special? special = null;
+        string? growth = null;
         if (done != null)
         {
+            growth = GrowthNote(done);
             explorerVisitPending = true;                       // gezgin bahçeye doğru yola çıkar
             special = ZooSpecials.From(data, done);
             if (special != null) zooArriving = special.Key;    // nadir dost bahçeye yürüyerek girer
         }
         UpdateAll();
-        if (done != null) ShowCoinReward(done, timeUp, special);
+        if (done != null) ShowCoinReward(done, timeUp, special, growth);
     }
 
     /// <summary>Süren oturumu kaydeder. Kaydedilen oturumu (5 sn'den kısaysa null) döndürür.</summary>

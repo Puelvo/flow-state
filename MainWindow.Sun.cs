@@ -147,6 +147,7 @@ public partial class MainWindow
         zooWorld.Night = DayCycle.IsNight(sunPalette);
         zooWorld.Noon = !zooWorld.Night && sunPalette.Stars < 0.1 && (Theme == GardenTheme.Day || (Theme == GardenTheme.Auto && DateTime.Now.Hour is >= 11 and < 16));
         emptyHint!.Visibility = zooWorld.Animals.Count == 0 && !widgetMode ? Visibility.Visible : Visibility.Collapsed;
+        UpdateGrowth();
     }
 
     /// <summary>Bahçedeki hayvanları (sahip olunanlar + nadir dostlar) sahne tuvaliyle eşitler.</summary>

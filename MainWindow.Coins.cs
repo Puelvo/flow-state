@@ -14,14 +14,14 @@ public partial class MainWindow
     static readonly Brush CoinText = new SolidColorBrush(Color.FromRgb(0xC9, 0x84, 0x10));
     readonly Random fxRnd = new();
 
-    void ShowCoinReward(Session s, bool timeUp, Special? special = null)
+    void ShowCoinReward(Session s, bool timeUp, Special? special = null, string? growth = null)
     {
         int coins = Zoo.SessionCoins(s);
         var course = data.Courses.FirstOrDefault(c => c.Id == s.CourseId)?.Name ?? "";
         FxLayer.UpdateLayout();
         var center = RewardOrigin();
 
-        var card = RewardCard(coins, timeUp, $"{course} · {Fmt(s.Seconds)}", special, out var count);
+        var card = RewardCard(coins, timeUp, $"{course} · {Fmt(s.Seconds)}", special, growth, out var count);
         double zoom = widgetMode ? 0.62 : 1;
         var scale = new ScaleTransform(0.4 * zoom, 0.4 * zoom);
         card.RenderTransformOrigin = new Point(0.5, 0.5);
@@ -62,7 +62,7 @@ public partial class MainWindow
         return new Point(FxLayer.ActualWidth / 2, FxLayer.ActualHeight / 2);
     }
 
-    FrameworkElement RewardCard(int coins, bool timeUp, string summary, Special? special, out TextBlock? count)
+    FrameworkElement RewardCard(int coins, bool timeUp, string summary, Special? special, string? growth, out TextBlock? count)
     {
         var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
 
@@ -101,6 +101,16 @@ public partial class MainWindow
             stack.Children.Add(Line("Biraz daha uzun odaklan, jetonlar gelsin.", 13, FontWeights.SemiBold, "Muted", 4));
         }
         stack.Children.Add(Line(summary, 13, FontWeights.Bold, "Muted", 6));
+        if (growth != null)
+        {
+            // Bahçede büyüme haberi: yeşil hap.
+            var g = new Border { CornerRadius = new CornerRadius(12), Padding = new Thickness(10, 4, 12, 5), Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
+            g.SetResourceReference(Border.BackgroundProperty, "GoodSoft");
+            var gt = new TextBlock { Text = growth, FontSize = 12.5, FontWeight = FontWeights.ExtraBold };
+            gt.SetResourceReference(TextBlock.ForegroundProperty, "Good");
+            g.Child = gt;
+            stack.Children.Add(g);
+        }
 
         if (special != null && ZooCatalog.Find(special.AnimalId) is { } animal)
         {
