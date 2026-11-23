@@ -130,13 +130,13 @@ public partial class MainWindow
                     break;
                 case "campfire":
                     double cx = W * 0.24, cy = top + band * 0.35;
-                    var glow = new Ellipse { Width = 140, Height = 60, IsHitTestVisible = false,
+                    var glow = new Ellipse { Width = 200, Height = 84, IsHitTestVisible = false,
                         Fill = new RadialGradientBrush(Color.FromArgb(0x70, 0xFF, 0xB8, 0x5A), Color.FromArgb(0, 0xFF, 0xB8, 0x5A)) };
                     campGlow = glow;
-                    Put(glow, cx - 70, cy - 40, (int)cy - 2);
+                    Put(glow, cx - 100, cy - 56, (int)cy - 2);
                     campfireImg = PixImage(Campfire()[0]);
                     Put(campfireImg, cx - campfireImg.Width / 2, cy - campfireImg.Height, (int)cy);
-                    Block((cx - 22, cy - 10, cx + 22, cy + 6));
+                    Block((cx - 30, cy - 12, cx + 30, cy + 6));
                     break;
                 case "tent":
                     double ex = W * 0.71, ey = top + 12;
@@ -199,9 +199,9 @@ public partial class MainWindow
         for (int tries = 0; tries < 900 && list.Count < MaxFlowers; tries++)
         {
             double x = 20 + rnd.NextDouble() * (W - 40), y = top + rnd.NextDouble() * (bottom - top);
-            if (blocks.Any(b => x > b.L - 14 && x < b.R + 14 && y > b.T - 10 && y < b.B + 14)) continue;
+            if (blocks.Any(b => x > b.L - 20 && x < b.R + 20 && y > b.T - 10 && y < b.B + 30)) continue;
             if (zooWorld.PathY is { } py && Math.Abs(py(x) - 4 - y) < 16) continue;            // patikanın üstüne değil
-            if (list.Any(p => Math.Abs(p.Item1 - x) < 34 && Math.Abs(p.Item2 - y) < 20)) continue;
+            if (list.Any(p => Math.Abs(p.Item1 - x) < 46 && Math.Abs(p.Item2 - y) < 26)) continue;
             list.Add((x, y));
         }
         return list;
@@ -266,13 +266,28 @@ public partial class MainWindow
     static readonly uint[] FlowerColors = { 0xFFFFB4D2, 0xFFFAF8F2, 0xFFFFE27A, 0xFFC9B6FF, 0xFFFF9F8A };
     static readonly Dictionary<int, BitmapSource> flowerCache = new();
 
+    static uint Shade(uint c) => 0xFF000000u | (uint)(((c >> 16) & 255) * 0.82) << 16 | (uint)(((c >> 8) & 255) * 0.82) << 8 | (uint)((c & 255) * 0.82);
+
     static BitmapSource Flower(int i)
     {
         int k = i % FlowerColors.Length;
         if (flowerCache.TryGetValue(k, out var b)) return b;
         uint petal = FlowerColors[k], heart = k == 2 ? 0xFFFFFFFF : 0xFFF5B731;
-        return flowerCache[k] = Pix(new[] { ".p.p.", "ppcpp", ".ppp.", "..g..", ".gg..", "..g.." },
-            new() { ['p'] = petal, ['c'] = heart, ['g'] = 0xFF5E9A45 });
+        // 9×12: beş taç yaprak, ortada göbek, iki yapraklı sap.
+        return flowerCache[k] = Pix(new[] {
+            "...pp....",
+            ".pppppp..",
+            "ppppPpppp",
+            ".ppcccpp.",
+            "pppcccppp",
+            ".pppPppp.",
+            "..pp.pp..",
+            "....g....",
+            ".ll.g....",
+            "..llg.ll.",
+            "....gll..",
+            "....g...." },
+            new() { ['p'] = petal, ['P'] = Shade(petal), ['c'] = heart, ['g'] = 0xFF5E9A45, ['l'] = 0xFF7DBA58 });
     }
 
     static readonly Dictionary<(int, bool), BitmapSource> treeCache = new();
@@ -357,24 +372,38 @@ public partial class MainWindow
     static BitmapSource[] Campfire() => fireBmp ??= new[]
     {
         Pix(new[] {
-            ".....y......",
-            "....yoy.....",
-            "...yorry....",
-            "...orrro....",
-            "....rro.....",
-            ".bbBbbBbbb..",
-            "bBbbBbbBbBb." }, FirePal),
+            "........y.........",
+            ".......yy.........",
+            "......yooy....y...",
+            ".....yoory...yo...",
+            "....yorrroy..yo...",
+            "....orrRrroyyoo...",
+            "...yorRRRrroorry..",
+            "...orrRRRRrrrrro..",
+            "....orrRRRrrrro...",
+            ".....orrrrrrro....",
+            "..ss..ooooooo..s..",
+            ".bbBbbBbbbBbbBbb..",
+            "bBbbBbbBbbBbBbbBb.",
+            ".sss.bbbBbbbb.sss." }, FirePal),
         Pix(new[] {
-            "......y.....",
-            ".....yoy....",
-            "....yorry...",
-            "...yorrro...",
-            "....orro....",
-            ".bbBbbBbbb..",
-            "bBbbBbbBbBb." }, FirePal),
+            "..........y.......",
+            ".........yy.......",
+            "...y.....yooy.....",
+            "...oy...yoory.....",
+            "...oy..yorrroy....",
+            "...ooyyorrRrro....",
+            "..yrroorrRRRroy...",
+            "..orrrrrRRRRrro...",
+            "...orrrrRRRrro....",
+            "....orrrrrrro.....",
+            "..s..ooooooo..ss..",
+            ".bbBbbBbbbBbbBbb..",
+            "bBbbBbbBbbBbBbbBb.",
+            ".sss.bbbBbbbb.sss." }, FirePal),
     };
     static readonly Dictionary<char, uint> FirePal = new()
-    { ['y'] = 0xFFFFE27A, ['o'] = 0xFFFFA94D, ['r'] = 0xFFFF6B4A, ['b'] = 0xFF8A6644, ['B'] = 0xFF6E4F33 };
+    { ['y'] = 0xFFFFE27A, ['o'] = 0xFFFFA94D, ['r'] = 0xFFFF6B4A, ['R'] = 0xFFFFD27A, ['b'] = 0xFF8A6644, ['B'] = 0xFF6E4F33, ['s'] = 0xFFB8B2A6 };
 
     static BitmapSource Tent()
     {
