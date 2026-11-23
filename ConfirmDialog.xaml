@@ -3,33 +3,34 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" SizeToContent="WidthAndHeight" ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner" FontFamily="Segoe UI" FontSize="14"
+        WindowStartupLocation="CenterOwner" FontFamily="{StaticResource AppFont}" FontSize="14" FontWeight="SemiBold"
         Foreground="{StaticResource Text}"
         KeyDown="Window_KeyDown" MouseLeftButtonDown="Window_MouseLeftButtonDown">
-    <Grid Margin="26">
-        <Border CornerRadius="22" Background="{StaticResource BgGrad}" BorderBrush="#33FFFFFF" BorderThickness="1"
-                Width="400" Padding="28,26,28,22">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="32" ShadowDepth="0" Opacity="0.7" Color="#000000"/>
-            </Border.Effect>
+    <!-- Gölgenin sığması için kenar boşluğu -->
+    <Grid Margin="34,26,34,42">
+        <Border x:Name="CardBox" Style="{StaticResource Card}" Effect="{StaticResource LiftShadow}"
+                Width="400" Padding="28,26,28,22" RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform>
+                <ScaleTransform x:Name="PopScale" ScaleX="1" ScaleY="1"/>
+            </Border.RenderTransform>
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <Grid Width="42" Height="42">
-                        <Ellipse x:Name="IconBg" Fill="#33E58A8A"/>
-                        <TextBlock x:Name="IconText" Text="!" FontSize="22" FontWeight="Bold" Foreground="#E58A8A"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <!-- Yuvarlak yumuşak ikon rozeti: tehlikede pembe/kırmızı, diğerlerinde tema rengi -->
+                    <Grid Width="52" Height="52">
+                        <Ellipse x:Name="IconBg" Fill="{StaticResource DangerSoft}"/>
+                        <Path x:Name="IconPath" Data="M12,6 L12,13.5 M12,17.9 L12,18" Width="24" Height="24" Stretch="None"
+                              Stroke="{StaticResource Danger}" StrokeThickness="3.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                     </Grid>
-                    <TextBlock x:Name="TitleText" FontSize="19" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                    <TextBlock x:Name="TitleText" FontSize="20" FontWeight="Black" VerticalAlignment="Center" Margin="14,0,0,0"
+                               TextWrapping="Wrap" MaxWidth="280"/>
                 </StackPanel>
 
-                <TextBlock x:Name="MessageText" Foreground="{StaticResource Muted}" TextWrapping="Wrap"
-                           LineHeight="22" Margin="0,18,0,0"/>
+                <TextBlock x:Name="MessageText" Style="{StaticResource Body}" LineHeight="22" Margin="2,18,0,0"/>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,26,0,0">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
                     <Button x:Name="CancelBtn" Content="Vazgeç" Style="{StaticResource Btn}" Padding="20,10"
                             IsCancel="True" Click="Cancel_Click"/>
-                    <Button x:Name="OkBtn" Style="{StaticResource Btn}" Padding="20,10" Margin="10,0,0,0"
-                            Foreground="#0A0E1A" FontWeight="SemiBold" Click="Ok_Click"/>
+                    <Button x:Name="OkBtn" Style="{StaticResource Primary}" Padding="22,10" Margin="10,0,0,0" Click="Ok_Click"/>
                 </StackPanel>
             </StackPanel>
         </Border>

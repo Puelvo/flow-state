@@ -4,7 +4,7 @@ using System.Windows.Media.Imaging;
 namespace FlowState;
 
 // Odak çemberindeki gezgin: oturum çalışırken yerinde yürür, duraklatılınca ya da oturum yokken durur.
-// Kareler Assets/explorer/explorer_walk.png içinde (tools/build-explorer.ps1 üretir): kare 0 duruş, 1.. yürüyüş.
+// Kareler Assets/explorer/explorer_walk.png içinde (tools/build-explorer-walk.py üretir): kare 0 duruş, 1.. yürüyüş.
 public partial class MainWindow
 {
     const int ExplorerCell = 192;

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 
 namespace FlowState;
@@ -84,6 +84,16 @@ public class AppData
     public ActiveSession? Active { get; set; }
     public double DailyGoalHours { get; set; } = 2;
     public string WidgetColor { get; set; } = "#5B8CFF"; // widget tema rengi (#RRGGBB)
+
+    // Çalış modu (yalnız bu cihazda): kronometre ya da geri sayım.
+    public bool Countdown { get; set; }
+    public int CountdownMinutes { get; set; } = 25;
+    // Geri sayımla başlatılmış süren seansın kimliği ve hedefi (yeniden açılışta hedef kaybolmasın).
+    public string CountdownRunId { get; set; } = "";
+    public int CountdownSeconds { get; set; }
+
+    // Bahçe teması (yalnız bu cihazda): "auto" günün saatine göre; "dawn" / "day" / "sunset" / "night" sabit.
+    public string GardenTheme { get; set; } = "auto";
 }
 
 public static class Store
@@ -137,8 +147,12 @@ public static class Store
         }
     }
 
+    /// <summary>true iken Save hiçbir şey yazmaz (ekran görüntüsü modu örnek veriyi diske dökmesin).</summary>
+    public static bool ReadOnly { get; set; }
+
     public static void Save(AppData data)
     {
+        if (ReadOnly) return;
         try
         {
             Directory.CreateDirectory(Dir);

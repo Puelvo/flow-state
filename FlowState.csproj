@@ -25,10 +25,11 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.0" />
   </ItemGroup>
 
-  <!-- Sprite şeritleri: hayvanlar (tools/build-sprites.ps1) ve odak çemberindeki gezgin (tools/build-explorer.ps1) -->
+  <!-- Yazı tipi (Nunito, OFL) ve sprite şeritleri: hayvanlar (tools/build-sprites.ps1) ve odak çemberindeki gezgin (tools/build-explorer.ps1) -->
   <ItemGroup>
     <Resource Include="Assets\pixellab\*.png" />
     <Resource Include="Assets/explorer/*.png" />
+    <Resource Include="Assets/fonts/*.ttf" />
   </ItemGroup>
 
 </Project>
