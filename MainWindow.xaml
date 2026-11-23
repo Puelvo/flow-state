@@ -230,6 +230,58 @@
                              StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
                         <Ellipse.RenderTransform><ScaleTransform x:Name="RingFaceScale"/></Ellipse.RenderTransform>
                     </Ellipse>
+                    <!-- Ay süsü (gece): kenarda mavimsi gölge, kenarlarda kraterler, parlak bir dokunuş. Saydamlığı vaktin "ay" oranıdır. -->
+                    <Grid x:Name="MoonDeco" Width="244" Height="244" IsHitTestVisible="False" Opacity="0"
+                          RenderTransformOrigin="0.5,0.5" RenderTransform="{Binding RenderTransform, ElementName=RingFace}">
+                        <Grid.Clip><EllipseGeometry Center="122,122" RadiusX="122" RadiusY="122"/></Grid.Clip>
+                        <!-- Gölge: sağ üstten bakan ışık, sol alt kenar koyulaşır -->
+                        <Ellipse>
+                            <Ellipse.Fill>
+                                <RadialGradientBrush Center="0.62,0.36" GradientOrigin="0.66,0.3" RadiusX="0.78" RadiusY="0.78">
+                                    <GradientStop Color="#00FFFFFF" Offset="0.55"/>
+                                    <GradientStop Color="#337A86C2" Offset="0.8"/>
+                                    <GradientStop Color="#667A86C2" Offset="1"/>
+                                </RadialGradientBrush>
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <Canvas>
+                            <Canvas.Resources>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill">
+                                        <Setter.Value>
+                                            <RadialGradientBrush Center="0.42,0.6" GradientOrigin="0.38,0.68" RadiusX="0.6" RadiusY="0.6">
+                                                <GradientStop Color="#40A3ABD6" Offset="0"/>
+                                                <GradientStop Color="#5A8E97C8" Offset="0.75"/>
+                                                <GradientStop Color="#1F8E97C8" Offset="1"/>
+                                            </RadialGradientBrush>
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Setter Property="Stroke" Value="#80FFFFFF"/>
+                                    <Setter Property="StrokeThickness" Value="1.5"/>
+                                </Style>
+                            </Canvas.Resources>
+                            <!-- Kraterler kenarlarda; ortadaki yazının arkası boş kalır -->
+                            <Ellipse Canvas.Left="20" Canvas.Top="40" Width="38" Height="34"/>
+                            <Ellipse Canvas.Left="166" Canvas.Top="24" Width="24" Height="22"/>
+                            <Ellipse Canvas.Left="188" Canvas.Top="166" Width="30" Height="27"/>
+                            <Ellipse Canvas.Left="40" Canvas.Top="172" Width="40" Height="36"/>
+                            <Ellipse Canvas.Left="118" Canvas.Top="208" Width="18" Height="16"/>
+                            <Ellipse Canvas.Left="210" Canvas.Top="92" Width="16" Height="15"/>
+                            <Ellipse Canvas.Left="10" Canvas.Top="122" Width="14" Height="13"/>
+                            <Ellipse Canvas.Left="96" Canvas.Top="14" Width="12" Height="11"/>
+                        </Canvas>
+                        <!-- Parlak dokunuş (sağ üst) -->
+                        <Ellipse Width="64" Height="40" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,30,34,0" Opacity="0.55"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform><RotateTransform Angle="38"/></Ellipse.RenderTransform>
+                            <Ellipse.Fill>
+                                <RadialGradientBrush>
+                                    <GradientStop Color="#CCFFFFFF" Offset="0"/>
+                                    <GradientStop Color="#00FFFFFF" Offset="1"/>
+                                </RadialGradientBrush>
+                            </Ellipse.Fill>
+                        </Ellipse>
+                    </Grid>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="200">
                         <TextBlock x:Name="TimerCourseName" Text="Bir ders seç" FontSize="20" FontWeight="Black"
                                    Foreground="{StaticResource Text}"

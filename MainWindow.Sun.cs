@@ -209,6 +209,8 @@ public partial class MainWindow
         SunGlow.Fill = new RadialGradientBrush(
             new GradientStopCollection { new(glow, 0.55), new(Color.FromArgb((byte)(glow.A / 3), glow.R, glow.G, glow.B), 0.78), new(Color.FromArgb(0, glow.R, glow.G, glow.B), 1) });
         SunTrack.Stroke = new SolidColorBrush(Color.FromArgb(0x60, 0xFF, 0xFF, 0xFF));
+        // Ay süsü: gece tam, şafak/gün batımı geçişinde yarı saydam, gündüz yok.
+        MoonDeco.Opacity = Math.Clamp((p.Moon - 0.15) / 0.7, 0, 1);
         if (widgetMode) ApplyWidgetBackground();
         UpdateRing();
     }
