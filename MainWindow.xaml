@@ -190,6 +190,41 @@
                 </StackPanel>
 
                 <!-- Yeni ders: küçük beyaz kart -->
+                <!-- Mod: kronometre / geri sayım; geri sayımda −/+ ile süre. Oturum sürerken gizlenir ama yer tutar (sayfa zıplamasın). -->
+                <StackPanel x:Name="ModePanel" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
+                    <Border Style="{StaticResource SegBar}" Padding="4">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="ModeStopwatch" GroupName="timermode" Style="{StaticResource Seg}" IsChecked="True" Checked="Mode_Checked"
+                                         ToolTip="Süre ileri doğru sayar; istediğin zaman bitir">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="{StaticResource IconTimer}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
+                                    <TextBlock Text="Kronometre" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="ModeCountdown" GroupName="timermode" Style="{StaticResource Seg}" Checked="Mode_Checked"
+                                         ToolTip="Bir süre seç; süre dolunca oturum kendiliğinden biter">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="{StaticResource IconHourglass}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
+                                    <TextBlock Text="Geri sayım" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="DurationPanel" Style="{StaticResource SegBar}" Padding="4" Margin="10,0,0,0" Visibility="Collapsed"
+                            ToolTip="Süreyi değiştir (fare tekerleği de olur)" MouseWheel="Duration_Wheel" Background="{StaticResource Surface}">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource Ghost}" Padding="8" Tag="-5" Click="Duration_Click">
+                                <Path Data="{StaticResource IconMinus}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.8"/>
+                            </Button>
+                            <TextBlock x:Name="DurationText" Text="25 dk" FontSize="14" FontWeight="Black" MinWidth="58" TextAlignment="Center"
+                                       VerticalAlignment="Center" Foreground="{StaticResource Text}"/>
+                            <Button Style="{StaticResource Ghost}" Padding="8" Tag="5" Click="Duration_Click">
+                                <Path Data="{StaticResource IconPlus}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.8"/>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
                 <Border x:Name="AddPanel" Style="{StaticResource Card}" HorizontalAlignment="Center" Margin="0,8,0,0"
                         Padding="10" CornerRadius="20" Visibility="Collapsed">
                     <StackPanel Orientation="Horizontal">
@@ -659,5 +694,7 @@
                 <Path Data="{StaticResource IconClose}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.2"/>
             </Button>
         </StackPanel>
+        <!-- Efekt katmanı: oturum sonu jeton ödülü vb. (MainWindow.Coins.cs) -->
+        <Canvas x:Name="FxLayer" Grid.RowSpan="2" IsHitTestVisible="False" Panel.ZIndex="100"/>
     </Grid>
 </Window>

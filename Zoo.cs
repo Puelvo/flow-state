@@ -1,4 +1,4 @@
-namespace FlowState;
+﻿namespace FlowState;
 
 /// <summary>Bir hayvan türü. Fiyat sabittir: kaç hayvan alınmış olursa olsun değişmez.
 /// Görsel şimdilik emoji; ileride Sprite alanı eklenip tek yerden değişecek.</summary>
@@ -69,14 +69,12 @@ public static class Zoo
     public static int SessionCoins(Session s)
         => (int)(BaseCoins(s.Seconds) * (1 + MaxLuck * Luck(s.Id)));
 
-    /// <param name="liveSeconds">Sürmekte olan seansın geçen süresi. Canlıyken yalnız taban sayılır;
-    /// şans payı seans bitince eklenir (sürpriz). Böylece canlı bakiye bitişteki değeri hiç aşmaz.</param>
-    public static int Earned(AppData d, double liveSeconds = 0)
-        => d.Sessions.Sum(SessionCoins) + (int)BaseCoins(Math.Max(0, liveSeconds));
+    /// <summary>Kazanılan jeton: yalnız bitmiş seanslar. Süren seans sayılmaz; jetonu seans bitince tek seferde gelir.</summary>
+    public static int Earned(AppData d) => d.Sessions.Sum(SessionCoins);
 
     public static int Spent(AppData d) => d.OwnedAnimals.Sum(o => o.Price);
 
-    public static int Balance(AppData d, double liveSeconds = 0) => Earned(d, liveSeconds) - Spent(d);
+    public static int Balance(AppData d) => Earned(d) - Spent(d);
 
     public static bool Owns(AppData d, string animalId)
         => d.OwnedAnimals.Any(o => o.AnimalId == animalId);
@@ -87,12 +85,12 @@ public static class Zoo
 
     public static bool MapComplete(AppData d, string mapId) => ZooCatalog.InMap(mapId).All(a => Owns(d, a.Id));
 
-    public static BuyResult Buy(AppData d, string animalId, double liveSeconds = 0)
+    public static BuyResult Buy(AppData d, string animalId)
     {
         var a = ZooCatalog.Find(animalId);
         if (a == null) return BuyResult.Unknown;
         if (Owns(d, animalId)) return BuyResult.AlreadyOwned;
-        if (Balance(d, liveSeconds) < a.Price) return BuyResult.NotEnough;
+        if (Balance(d) < a.Price) return BuyResult.NotEnough;
         d.OwnedAnimals.Add(new OwnedAnimal { AnimalId = animalId, Price = a.Price });
         return BuyResult.Ok;
     }

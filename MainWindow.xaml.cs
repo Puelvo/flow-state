@@ -39,6 +39,8 @@ public partial class MainWindow : Window
         if (ShotMode) { Store.ReadOnly = true; SeedSample(); } // ekran görüntüsü modu: örnek veri, diske yazma yok
         InitializeComponent();
         RingHost.LayoutTransform = NormalRingScale;
+        data.CountdownMinutes = Math.Clamp(data.CountdownMinutes, 5, 180);
+        if (data.Countdown) ModeCountdown.IsChecked = true;
 
         // Önceki çalışma çökme/kapanma ile yarım kaldıysa kaydet.
         if (data.Active is { } a)
@@ -338,6 +340,9 @@ public partial class MainWindow : Window
             activeStart = DateTime.Now;
             activeRunId = Guid.NewGuid().ToString("N");
             lastCheckpoint = 0;
+            countdownTarget = data.Countdown ? data.CountdownMinutes * 60 : 0;
+            data.CountdownRunId = countdownTarget > 0 ? activeRunId : "";
+            data.CountdownSeconds = countdownTarget;
             sw.Restart();
         }
         else if (sw.IsRunning) sw.Stop();
@@ -349,25 +354,35 @@ public partial class MainWindow : Window
     static string Clock(int s) => $"{s / 3600:00}:{s % 3600 / 60:00}:{s % 60:00}";
 
 
-    void FinishBtn_Click(object sender, RoutedEventArgs e)
+    void FinishBtn_Click(object sender, RoutedEventArgs e) => FinishSession(timeUp: false);
+
+    /// <summary>Oturumu bitirir ve kazanılan jetonu animasyonla gösterir (Bitir düğmesi / geri sayımın sonu).</summary>
+    void FinishSession(bool timeUp)
     {
-        Commit();
+        var done = Commit();
         UpdateAll();
+        if (done != null) ShowCoinReward(done, timeUp);
     }
 
-    void Commit()
+    /// <summary>Süren oturumu kaydeder. Kaydedilen oturumu (5 sn'den kısaysa null) döndürür.</summary>
+    Session? Commit()
     {
-        if (!active) return;
+        if (!active) return null;
         sw.Stop();
         int s = (int)sw.Elapsed.TotalSeconds;
+        if (countdownTarget > 0) s = Math.Min(s, countdownTarget); // geri sayım hedefi aşılmaz
+        Session? saved = null;
         if (s >= 5)
-            data.Sessions.Add(new Session { Id = RunIdOrNew(), CourseId = activeCourseId, Start = activeStart, Seconds = s });
+            data.Sessions.Add(saved = new Session { Id = RunIdOrNew(), CourseId = activeCourseId, Start = activeStart, Seconds = s });
+        countdownTarget = 0;
+        data.CountdownRunId = "";
         active = false;
         sw.Reset();
         data.Active = null;
         PublishLive();
         Save();
         Title = "Flow State";
+        return saved;
     }
 
     // ---------- canlı seans: cihazlar arası paylaşım ----------
@@ -390,6 +405,7 @@ public partial class MainWindow : Window
         activeRunId = l.RunId;
         lastCheckpoint = 0;
         lastTickSecond = -1;
+        countdownTarget = active && l.RunId == data.CountdownRunId ? data.CountdownSeconds : 0;
         if (active) sw.Set(l.Accumulated, l.RunningSince);
         else { sw.Reset(); data.Active = null; Title = "Flow State"; }
     }
@@ -426,7 +442,7 @@ public partial class MainWindow : Window
     void UpdateRing()
     {
         double t = active ? sw.Elapsed.TotalSeconds : 0;
-        double frac = t % 3600 / 3600;
+        double frac = countdownTarget > 0 ? Math.Min(t / countdownTarget, 1) : t % 3600 / 3600;
         if (frac < 0.002) { RingArc.Visibility = Visibility.Collapsed; ringShown = 0; return; }
         frac = Math.Min(frac, 0.9999);
         EnsureRingSegments();
@@ -502,6 +518,13 @@ public partial class MainWindow : Window
 
     void UpdatePips()
     {
+        if (countdownTarget > 0 || (!active && data.Countdown))
+        {
+            if (pipsShown != -2) { HourPips.Children.Clear(); pipsShown = -2; }
+            PipsLabel.Text = !active ? "Süre dolunca oturum kendiliğinden biter"
+                : $"{Fmt(countdownTarget)} hedefin %{Math.Min(100, ActiveSeconds * 100 / countdownTarget)}'i tamam";
+            return;
+        }
         int laps = ActiveSeconds / 3600;
         // Her saniye yeniden kurmamak için yalnızca sayı değişince çizilir.
         int key = active ? laps : -1;
@@ -535,6 +558,13 @@ public partial class MainWindow : Window
 
         if (s == lastTickSecond) return;
         lastTickSecond = s;
+
+        if (active && countdownTarget > 0 && sw.IsRunning && s >= countdownTarget)
+        {
+            System.Media.SystemSounds.Asterisk.Play();
+            FinishSession(timeUp: true);
+            return;
+        }
 
         if (active)
         {
@@ -687,7 +717,13 @@ public partial class MainWindow : Window
             { Color = tc, BlurRadius = 14, ShadowDepth = 2, Direction = 270, Opacity = 0.35 };
 
         int es = ActiveSeconds;
-        ElapsedText.Text = Clock(es);
+        ElapsedText.Text = countdownTarget > 0 ? Clock(Math.Max(0, countdownTarget - es))
+            : !active && data.Countdown ? Clock(data.CountdownMinutes * 60)
+            : Clock(es);
+        // Mod seçici oturum sürerken gizli ama yer tutar; widget'ta hiç yok.
+        ModePanel.Visibility = widgetMode ? Visibility.Collapsed : active ? Visibility.Hidden : Visibility.Visible;
+        DurationPanel.Visibility = data.Countdown ? Visibility.Visible : Visibility.Collapsed;
+        DurationText.Text = $"{data.CountdownMinutes} dk";
         ElapsedText.Opacity = !active ? 0.4 : sw.IsRunning ? 1 : 0.6;
 
         UpdateRing();
@@ -1141,6 +1177,33 @@ public partial class MainWindow : Window
     // ---------- widget modu ----------
 
     bool widgetMode;
+
+    int countdownTarget; // süren seansın geri sayım hedefi (sn); 0 = kronometre
+
+    void Mode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!ready) return;
+        data.Countdown = ModeCountdown.IsChecked == true;
+        Store.Save(data);
+        UpdateAll();
+    }
+
+    void Duration_Click(object sender, RoutedEventArgs e)
+        => ChangeDuration(int.Parse((string)((FrameworkElement)sender).Tag));
+
+    void Duration_Wheel(object sender, MouseWheelEventArgs e)
+    {
+        ChangeDuration(e.Delta > 0 ? 5 : -5);
+        e.Handled = true;
+    }
+
+    void ChangeDuration(int delta)
+    {
+        if (active) return;
+        data.CountdownMinutes = Math.Clamp(data.CountdownMinutes + delta, 5, 180);
+        Store.Save(data);
+        UpdateAll();
+    }
 
     // Büyük pencerede çember biraz küçültülür ki düğmeler varsayılan boyda kaydırmadan görünsün.
     static readonly ScaleTransform NormalRingScale = new(0.88, 0.88);

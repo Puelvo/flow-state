@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -49,7 +49,7 @@ public partial class MainWindow
 
     void UpdateZoo()
     {
-        int balance = Zoo.Balance(data, ActiveSeconds);
+        int balance = Zoo.Balance(data);
         int affordable = Zoo.AffordableCount(data, ActiveMapId, balance);
         bool canBuy = affordable > 0;
 
@@ -1025,7 +1025,7 @@ public partial class MainWindow
 
     void BuyAnimal(string id)
     {
-        if (Zoo.Buy(data, id, ActiveSeconds) != BuyResult.Ok) return;
+        if (Zoo.Buy(data, id) != BuyResult.Ok) return;
         Save();
         zooBoughtId = id;
         GoZoo(ZooScreen.Bought);

@@ -109,6 +109,30 @@ public partial class MainWindow
         NavTimer.IsChecked = true;
         SetWidgetMode(true);
         await Shot("11-widget", 1600);
+        SetWidgetMode(false);
+
+        // Jeton ödülü: 1,5 saatlik bir oturumun bitişi (kart açılmış, jetonlar havada / sekmeye varmış).
+        Commit();
+        UpdateAll();
+        await Task.Delay(800);
+        ShowCoinReward(new Session { Id = "shot-reward", CourseId = SelectedCourse?.Id ?? Course.GeneralId, Start = DateTime.Now.AddMinutes(-95), Seconds = 5400 }, false);
+        await Shot("12-jeton", 650);
+        await Shot("13-jeton-ucus", 900);
+        await Task.Delay(3000);
+
+        // Geri sayım: boşta (süre seçici) ve çalışırken (45 dk hedefin 17 dk'sı geçmiş).
+        ModeCountdown.IsChecked = true;
+        data.CountdownMinutes = 45;
+        UpdateAll();
+        await Shot("14-geri-sayim", 900);
+        data.CountdownRunId = "shot-cd"; data.CountdownSeconds = 45 * 60;
+        ApplyLiveLocal(new LiveState
+        {
+            Active = true, RunId = "shot-cd", CourseId = SelectedCourse?.Id ?? Course.GeneralId,
+            Start = DateTime.Now.AddMinutes(-17), Accumulated = 17 * 60 + 12, RunningSince = DateTime.UtcNow
+        });
+        UpdateAll();
+        await Shot("15-geri-sayim-calisirken", 1400);
     }
 
     /// <summary>Pencerenin görüntüsünü, istenirse bir kaydırma alanının tam boyunu da kaydeder.</summary>

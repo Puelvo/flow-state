@@ -84,6 +84,13 @@ public class AppData
     public ActiveSession? Active { get; set; }
     public double DailyGoalHours { get; set; } = 2;
     public string WidgetColor { get; set; } = "#5B8CFF"; // widget tema rengi (#RRGGBB)
+
+    // Çalış modu (yalnız bu cihazda): kronometre ya da geri sayım.
+    public bool Countdown { get; set; }
+    public int CountdownMinutes { get; set; } = 25;
+    // Geri sayımla başlatılmış süren seansın kimliği ve hedefi (yeniden açılışta hedef kaybolmasın).
+    public string CountdownRunId { get; set; } = "";
+    public int CountdownSeconds { get; set; }
 }
 
 public static class Store
