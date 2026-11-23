@@ -205,7 +205,8 @@ public partial class MainWindow
 
         // Güneş saat: disk (güneş ya da ay), hâle, iz halkası ve ilerleme halkası.
         RingFace.Fill = new RadialGradientBrush(C(p.DiscA), C(p.DiscB)) { GradientOrigin = new Point(0.42, 0.36), Center = new Point(0.45, 0.42), RadiusX = 0.62, RadiusY = 0.62 };
-        RingFace.Stroke = new SolidColorBrush(Color.FromArgb(0xC0, C(p.Ray).R, C(p.Ray).G, C(p.Ray).B));
+        // Güneşin noktalı süs halkası gece kaybolur (ay sade kalsın).
+        RingFace.Stroke = new SolidColorBrush(Color.FromArgb((byte)(0xC0 * Math.Clamp(1 - p.Moon, 0, 1)), C(p.Ray).R, C(p.Ray).G, C(p.Ray).B));
         var glow = C(p.Glow);
         SunGlow.Fill = new RadialGradientBrush(
             new GradientStopCollection { new(glow, 0.55), new(Color.FromArgb((byte)(glow.A / 3), glow.R, glow.G, glow.B), 0.78), new(Color.FromArgb(0, glow.R, glow.G, glow.B), 1) });
