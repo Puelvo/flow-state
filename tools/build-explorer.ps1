@@ -1,3 +1,6 @@
+# NOT: Yürüyüş şeridi artık tools/build-explorer-walk.py ile üretiliyor (bacaklar prosedürel çiziliyor).
+#      Bu betik yalnızca kaynak görsellerden karakteri yeniden ayıklamak gerekirse kullanılır;
+#      çıktısının duruş karesi src/explorer_idle.png, 3. karesi src/explorer_body.png olarak saklanır.
 # Gezgin karakterinin yürüme şeridini üretir (odak çemberinde yürüyen karakter).
 # Kaynak: Assetsexplorersrcexplorer.jpg (duruş karesi) ve explorer_walk2.png (yürüyüş) — 2 satır × 5 kutuluk sunum görselleri.
 # Çıktı:  Assets\explorer\explorer_walk.png — 192x192 kareler yan yana; kare 0 = duruş, 1.. = yürüyüş.
