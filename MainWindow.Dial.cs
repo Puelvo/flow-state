@@ -102,7 +102,7 @@ public partial class MainWindow
         var stack = new StackPanel();
         var title = new TextBlock { Text = "Ne kadar odaklanalım?", FontSize = 20, FontWeight = FontWeights.Black, HorizontalAlignment = HorizontalAlignment.Center };
         title.SetResourceReference(TextBlock.ForegroundProperty, "Text");
-        var sub = new TextBlock { Text = "Tutamacı çevir, süre dolunca oturum kendiliğinden biter.", FontSize = 12.5, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
+        var sub = new TextBlock { Text = "Tutamacı çevir; süre dolunca oturum biter.", FontSize = 12.5, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
         sub.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         stack.Children.Add(title);
         stack.Children.Add(sub);
@@ -162,7 +162,8 @@ public partial class MainWindow
         var host = new Grid { Width = DialSize, Height = DialSize, Margin = new Thickness(0, 16, 0, 4), Background = Brushes.Transparent, Cursor = Cursors.Hand };
 
         // İz halkası.
-        var track = new Ellipse { Width = DialR * 2, Height = DialR * 2, StrokeThickness = DialStroke };
+        // Ellipse kalınlığı sınırın içine çizer: çizginin ortası DialR'de olsun diye çap 2R + kalınlık.
+        var track = new Ellipse { Width = DialR * 2 + DialStroke, Height = DialR * 2 + DialStroke, StrokeThickness = DialStroke };
         track.SetResourceReference(Shape.StrokeProperty, "Track");
         host.Children.Add(track);
 
