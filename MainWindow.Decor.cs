@@ -275,6 +275,7 @@ public partial class MainWindow
         zooWorld.Shade = (tx, ty);
         zooWorld.Blocks.Add((tx - 14, ty - 10, tx + 14, ty + 6));
         owlImg = PixImage(Owl()[0]);
+        owlImg.Visibility = sunPalette.Moon >= 0.5 ? Visibility.Visible : Visibility.Collapsed;
         Put(owlImg, tx + 30, ty - tree.Height - 12, (int)ty + 1);
         treeCrown = (tx - tree.Width / 2 + 20, ty - tree.Height + 6, tree.Width - 40);
 
