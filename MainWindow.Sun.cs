@@ -84,7 +84,7 @@ public partial class MainWindow
         SunScene.SizeChanged += (_, _) => LayoutScene();
         RingHost.SizeChanged += (_, _) => LayoutScene();
         PipsBar.SizeChanged += (_, _) => LayoutScene();
-        PipsBar.IsVisibleChanged += (_, _) => Dispatcher.BeginInvoke(LayoutScene);
+        BottomRow.SizeChanged += (_, _) => LayoutScene();
         TopRow.SizeChanged += (_, _) => LayoutScene();
         ApplySunPalette(force: true);
         EnsureZooTimer();
@@ -95,9 +95,10 @@ public partial class MainWindow
     {
         if (skyRect == null || SunScene.ActualHeight <= 0) return;
         double h = SunScene.ActualHeight, w = SunScene.ActualWidth;
-        var anchor = PipsBar.IsVisible ? (FrameworkElement)PipsBar : RingHost;
-        double bottom = anchor.TranslatePoint(new Point(0, anchor.ActualHeight), SunScene).Y;
-        double horizon = Math.Clamp(bottom + (PipsBar.IsVisible ? 18 : 4), h * 0.42, h - 190);
+        // Ufuk sabit: güneş tepelerin üstünde, alt kenarı ufka hafifçe değer (yıldız çubuğu açılıp kapanınca sahne oynamaz).
+        double bottom = RingHost.TranslatePoint(new Point(0, RingHost.ActualHeight), SunScene).Y;
+        double horizon = Math.Clamp(bottom + 4, h * 0.42, h - 190);
+        UpdateAvoid(horizon);
         if (Math.Abs(horizon - horizonY) < 1 && hillsImg!.Width >= w) return;
         horizonY = horizon;
 
@@ -111,6 +112,16 @@ public partial class MainWindow
         lightRect!.Margin = new Thickness(0, horizon - 9, 0, 0);
         fireflyLayer!.Margin = new Thickness(0, horizon, 0, 0);
         emptyHint!.Margin = new Thickness(0, 0, 0, Math.Max(150, (h - horizon) * 0.5));
+    }
+
+    /// <summary>Hayvanlar ve gezgin çimendeki düğmelerin (ve yıldız çubuğunun) arkasında durmasın.</summary>
+    void UpdateAvoid(double horizon)
+    {
+        if (sceneAnimals == null || BottomRow.ActualWidth <= 0) return;
+        double top = horizon - 44;                            // hayvan tuvalinin üstü
+        var tl = BottomRow.TranslatePoint(new Point(0, 0), SunScene);
+        // Ayak noktası düğmelerin üstünden ~40 px yukarıdan alta kadar ve iki yanda 50 px pay.
+        zooWorld.Avoid = (tl.X - 50, tl.Y - top - 10, tl.X + BottomRow.ActualWidth + 50, double.MaxValue);
     }
 
     // ---------- her saniye ----------

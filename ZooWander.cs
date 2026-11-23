@@ -56,6 +56,18 @@ public sealed class ZooWorld
     public double Celebrating;             // > 0: hayvanlar gezginin etrafında (oturum bitti)
     public const double KeeperSpeed = 34, CelebrateSeconds = 11;
     public double Width, Height;
+
+    /// <summary>Hayvanların durmadığı alan (ör. çimendeki düğmeler); boşsa yok. Sahne pikseli, ayak noktası.</summary>
+    public (double L, double T, double R, double B)? Avoid;
+
+    /// <summary>Hedef yasak alandaysa yatayda en yakın kenarın dışına iter.</summary>
+    double Clear(double x, double y)
+    {
+        if (Avoid is not { } a || y < a.T || y > a.B || x < a.L || x > a.R) return x;
+        double left = a.L - 12, right = a.R + 12;
+        bool goLeft = (x - a.L < a.R - x && left > MinX) || right > MaxX;
+        return Math.Clamp(goLeft ? left : right, MinX, MaxX);
+    }
     readonly Random rng = new();
 
     double MinX => Sprite * 0.5;
@@ -94,7 +106,7 @@ public sealed class ZooWorld
     void UpdateKeeper(double dt)
     {
         var k = Keeper;
-        if (double.IsNaN(k.X)) { k.X = Width * 0.5; k.Y = (MinY + MaxY) / 2 + 20; k.FacingRight = true; k.Timer = 2; }
+        if (double.IsNaN(k.X)) { k.Y = (MinY + MaxY) / 2; k.X = Clear(Width * 0.5, k.Y); k.FacingRight = true; k.Timer = 2; }
         if (k.HopT >= 0) { k.HopT += dt / HopSeconds; if (k.HopT >= 1) k.HopT = -1; }
         if (k.HappyTimer > 0) k.HappyTimer -= dt;
         if (Celebrating > 0)
@@ -121,8 +133,8 @@ public sealed class ZooWorld
                 {
                     double reach = KeeperWalking ? Rand(120, 320) : Rand(40, 110);
                     double dir = k.X > Width * 0.7 ? -1 : k.X < Width * 0.3 ? 1 : (rng.Next(2) == 0 ? -1 : 1);
-                    k.TargetX = Math.Clamp(k.X + dir * reach, MinX + 30, MaxX - 30);
                     k.TargetY = Math.Clamp(k.Y + Rand(-30, 30), MinY + 10, MaxY);
+                    k.TargetX = Clear(Math.Clamp(k.X + dir * reach, MinX + 30, MaxX - 30), k.TargetY);
                     k.State = WanderState.Walk;
                 }
                 else k.Timer = Rand(3, 7);
@@ -141,8 +153,8 @@ public sealed class ZooWorld
             double side = i % 2 == 0 ? -1 : 1, ring = 1 + i / 2;
             w.Welcoming = true; w.Arriving = false;
             w.Pose = ZooPose.Stand; w.State = WanderState.Walk;
-            w.TargetX = Math.Clamp(v.X + side * (56 + ring * 52 + Rand(-6, 6)), MinX, MaxX);
             w.TargetY = Math.Clamp(v.Y + Rand(-22, 22), MinY, MaxY);
+            w.TargetX = Clear(Math.Clamp(v.X + side * (56 + ring * 52 + Rand(-6, 6)), MinX, MaxX), w.TargetY);
         }
     }
 
@@ -238,7 +250,7 @@ public sealed class ZooWorld
         }
         else
         {
-            w.X = Rand(MinX, MaxX);
+            w.X = Clear(Rand(MinX, MaxX), w.Y);
             w.FacingRight = rng.Next(2) == 0;
             w.Timer = Rand(0.3, 4);
             w.GreetCooldown = Rand(2, 8);
@@ -250,16 +262,16 @@ public sealed class ZooWorld
         if (Celebrating > 0)
         {
             // Kutlama sürerken gezginin yakınında dolaşırlar.
-            w.TargetX = Math.Clamp(Keeper.X + Rand(-150, 150), MinX, MaxX);
             w.TargetY = Math.Clamp(Keeper.Y + Rand(-30, 30), MinY, MaxY);
+            w.TargetX = Clear(Math.Clamp(Keeper.X + Rand(-150, 150), MinX, MaxX), w.TargetY);
             return;
         }
         if (w.Follow is { } parent && !double.IsNaN(parent.X) && rng.NextDouble() < 0.8)
         {
             // Yavru: annesinin arkasında, biraz yanında durur.
             double behind = parent.FacingRight ? -1 : 1;
-            w.TargetX = Math.Clamp(parent.X + behind * Rand(38, 60), MinX, MaxX);
             w.TargetY = Math.Clamp(parent.Y + Rand(4, 16), MinY, MaxY);
+            w.TargetX = Clear(Math.Clamp(parent.X + behind * Rand(38, 60), MinX, MaxX), w.TargetY);
             return;
         }
         // Ara sıra bir arkadaşının yanına gider; böylece karşılaşmalar kendiliğinden olur.
@@ -268,13 +280,13 @@ public sealed class ZooWorld
         {
             var o = others[rng.Next(others.Count)];
             double side = w.X < o.X ? -1 : 1;
-            w.TargetX = Math.Clamp(o.X + side * 58, MinX, MaxX);
             w.TargetY = Math.Clamp(o.Y + Rand(-6, 6), MinY, MaxY);
+            w.TargetX = Clear(Math.Clamp(o.X + side * 58, MinX, MaxX), w.TargetY);
             return;
         }
         double ang = Rand(0, Math.PI * 2), d = Mood == ZooMood.Calm ? Rand(30, 100) : Mood == ZooMood.Play ? Rand(90, 280) : Rand(70, 240);
-        w.TargetX = Math.Clamp(w.X + Math.Cos(ang) * d, MinX, MaxX);
         w.TargetY = Math.Clamp(w.Y + Math.Sin(ang) * d * 0.6, MinY, MaxY);
+        w.TargetX = Clear(Math.Clamp(w.X + Math.Cos(ang) * d, MinX, MaxX), w.TargetY);
     }
 
     /// <summary>Yan yana gelen iki hayvan selamlaşır; üst üste binenlerden biri uzaklaşır.</summary>
