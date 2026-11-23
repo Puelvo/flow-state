@@ -173,9 +173,9 @@
                     </ListBox.ItemsPanel>
                 </ListBox>
 
-                <!-- Araç satırı: ders ekle/sil ve kronometre / geri sayım seçici yan yana (dikeyde yer kazanmak için) -->
+                <!-- Araç satırı: ders ekle / sil -->
                 <WrapPanel HorizontalAlignment="Center" Margin="0,4,0,0">
-                    <StackPanel x:Name="CourseTools" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <StackPanel x:Name="CourseTools" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Style="{StaticResource Ghost}" FontSize="12" Padding="10,5" Click="ToggleAdd_Click">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource IconPlus}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.6"/>
@@ -192,40 +192,6 @@
                     </StackPanel>
 
                     <!-- Yeni ders: küçük beyaz kart -->
-                    <!-- Mod: kronometre / geri sayım; geri sayımda −/+ ile süre. Oturum sürerken gizlenir ama yer tutar (sayfa zıplamasın). -->
-                    <StackPanel x:Name="ModePanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4,0,4">
-                        <Border Style="{StaticResource SegBar}" Padding="4">
-                            <StackPanel Orientation="Horizontal">
-                                <RadioButton x:Name="ModeStopwatch" GroupName="timermode" Style="{StaticResource Seg}" IsChecked="True" Checked="Mode_Checked"
-                                             ToolTip="Süre ileri doğru sayar; istediğin zaman bitir">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Path Data="{StaticResource IconTimer}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
-                                        <TextBlock Text="Kronometre" Margin="6,0,0,0" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </RadioButton>
-                                <RadioButton x:Name="ModeCountdown" GroupName="timermode" Style="{StaticResource Seg}" Checked="Mode_Checked"
-                                             ToolTip="Bir süre seç; süre dolunca oturum kendiliğinden biter">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Path Data="{StaticResource IconHourglass}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
-                                        <TextBlock Text="Geri sayım" Margin="6,0,0,0" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </RadioButton>
-                            </StackPanel>
-                        </Border>
-                        <Border x:Name="DurationPanel" Style="{StaticResource SegBar}" Padding="4" Margin="10,0,0,0" Visibility="Collapsed"
-                                ToolTip="Süreyi değiştir (fare tekerleği de olur)" MouseWheel="Duration_Wheel" Background="{StaticResource Surface}">
-                            <StackPanel Orientation="Horizontal">
-                                <Button Style="{StaticResource Ghost}" Padding="8" Tag="-5" Click="Duration_Click">
-                                    <Path Data="{StaticResource IconMinus}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.8"/>
-                                </Button>
-                                <TextBlock x:Name="DurationText" Text="25 dk" FontSize="14" FontWeight="Black" MinWidth="58" TextAlignment="Center"
-                                           VerticalAlignment="Center" Foreground="{StaticResource Text}"/>
-                                <Button Style="{StaticResource Ghost}" Padding="8" Tag="5" Click="Duration_Click">
-                                    <Path Data="{StaticResource IconPlus}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.8"/>
-                                </Button>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
                 </WrapPanel>
 
                 <Border x:Name="AddPanel" Style="{StaticResource Card}" HorizontalAlignment="Center" Margin="0,8,0,0"
@@ -282,6 +248,68 @@
                 <StackPanel x:Name="HourPips" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0" Height="18"/>
                 <TextBlock x:Name="PipsLabel" Foreground="{StaticResource Muted}" FontSize="14" FontWeight="Bold"
                            HorizontalAlignment="Center" Margin="0,6,0,0"/>
+
+                <!-- Mod seçici: başlat/bitir düğmelerinin hemen üstünde; oturum başlayınca gizlenir.
+                     Geri sayım'a tıklanınca süre menüsü (DurationPopup) açılır. -->
+                <StackPanel x:Name="ModePanel" HorizontalAlignment="Center" Margin="0,14,0,0">
+                    <Border Style="{StaticResource SegBar}" Padding="4">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="ModeStopwatch" GroupName="timermode" Style="{StaticResource Seg}" IsChecked="True" Checked="Mode_Checked"
+                                         ToolTip="Süre ileri doğru sayar; istediğin zaman bitir">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="{StaticResource IconTimer}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
+                                    <TextBlock Text="Kronometre" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="ModeCountdown" GroupName="timermode" Style="{StaticResource Seg}" Checked="Mode_Checked"
+                                         Click="ModeCountdown_Click" ToolTip="Süre seç; süre dolunca oturum kendiliğinden biter">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="{StaticResource IconHourglass}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
+                                    <TextBlock x:Name="CountdownLabel" Text="Geri sayım" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Süre menüsü: hazır süreler + özel süre (−/+, fare tekerleği). Dışarı tıklayınca kapanır. -->
+                    <Popup x:Name="DurationPopup" PlacementTarget="{Binding ElementName=ModeCountdown}" Placement="Custom"
+                           StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                        <Border Margin="22" Style="{StaticResource Card}" Padding="20,18,20,16" Width="318"
+                                TextElement.FontFamily="{StaticResource AppFont}" TextElement.FontWeight="SemiBold">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="34" Height="34" CornerRadius="17" Background="{DynamicResource AccentSoft}">
+                                        <Path Data="{StaticResource IconHourglass}" Style="{StaticResource Icon}" Width="16" Height="16"
+                                              Stroke="{DynamicResource AccentDeep}" HorizontalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="Ne kadar odaklanacaksın?" FontSize="16" FontWeight="Black" Foreground="{StaticResource Text}"/>
+                                        <TextBlock Text="Süre dolunca oturum kendiliğinden biter." FontSize="12" Foreground="{StaticResource Muted}" Margin="0,1,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <WrapPanel x:Name="DurationPresets" Margin="-4,14,-4,0"/>
+                                <Border Height="2" Background="{StaticResource Line}" CornerRadius="1" Margin="0,12,0,12"/>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="Tamam" Style="{StaticResource Primary}" Padding="16,7" Click="DurationDone_Click"/>
+                                    <TextBlock Text="Özel" FontWeight="ExtraBold" Foreground="{StaticResource Text}" VerticalAlignment="Center"/>
+                                    <Border Background="{StaticResource Panel2}" CornerRadius="16" Padding="2" Margin="10,0,10,0"
+                                            HorizontalAlignment="Left" MouseWheel="Duration_Wheel">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Style="{StaticResource Ghost}" Padding="8" Tag="-5" Click="Duration_Click">
+                                                <Path Data="{StaticResource IconMinus}" Style="{StaticResource Icon}" Width="11" Height="11" StrokeThickness="2.8"/>
+                                            </Button>
+                                            <TextBlock x:Name="DurationText" Text="25 dk" FontSize="14" FontWeight="Black" MinWidth="54" TextAlignment="Center"
+                                                       VerticalAlignment="Center" Foreground="{StaticResource Text}"/>
+                                            <Button Style="{StaticResource Ghost}" Padding="8" Tag="5" Click="Duration_Click">
+                                                <Path Data="{StaticResource IconPlus}" Style="{StaticResource Icon}" Width="11" Height="11" StrokeThickness="2.8"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </StackPanel>
 
                 <StackPanel x:Name="BtnRow" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,14,0,0">
                     <Button x:Name="StartBtn" Style="{StaticResource Round}" Width="92" Height="92" VerticalAlignment="Center"

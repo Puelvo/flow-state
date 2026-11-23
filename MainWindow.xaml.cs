@@ -41,6 +41,7 @@ public partial class MainWindow : Window
         RingHost.LayoutTransform = NormalRingScale;
         data.CountdownMinutes = Math.Clamp(data.CountdownMinutes, 5, 180);
         if (data.Countdown) ModeCountdown.IsChecked = true;
+        DurationPopup.CustomPopupPlacementCallback = PlaceDurationPopup;
 
         // Önceki çalışma çökme/kapanma ile yarım kaldıysa kaydet.
         if (data.Active is { } a)
@@ -521,7 +522,7 @@ public partial class MainWindow : Window
         if (countdownTarget > 0 || (!active && data.Countdown))
         {
             if (pipsShown != -2) { HourPips.Children.Clear(); pipsShown = -2; }
-            PipsLabel.Text = !active ? "Süre dolunca oturum kendiliğinden biter"
+            PipsLabel.Text = !active ? ""
                 : $"{Fmt(countdownTarget)} hedefin %{Math.Min(100, ActiveSeconds * 100 / countdownTarget)}'i tamam";
             return;
         }
@@ -720,14 +721,21 @@ public partial class MainWindow : Window
         ElapsedText.Text = countdownTarget > 0 ? Clock(Math.Max(0, countdownTarget - es))
             : !active && data.Countdown ? Clock(data.CountdownMinutes * 60)
             : Clock(es);
-        // Mod seçici oturum sürerken gizli ama yer tutar; widget'ta hiç yok.
-        ModePanel.Visibility = widgetMode ? Visibility.Collapsed : active ? Visibility.Hidden : Visibility.Visible;
-        DurationPanel.Visibility = data.Countdown ? Visibility.Visible : Visibility.Collapsed;
+        // Mod seçici yalnızca oturum yokken görünür; widget'ta hiç yok.
+        ModePanel.Visibility = widgetMode || active ? Visibility.Collapsed : Visibility.Visible;
+        if (active) DurationPopup.IsOpen = false;
+        CountdownLabel.Text = data.Countdown ? $"Geri sayım · {data.CountdownMinutes} dk" : "Geri sayım";
         DurationText.Text = $"{data.CountdownMinutes} dk";
         ElapsedText.Opacity = !active ? 0.4 : sw.IsRunning ? 1 : 0.6;
 
         UpdateRing();
         UpdatePips();
+        // Boş yıldız satırı ve boş etiket yer kaplamasın (düğmeler kaydırmadan görünsün).
+        if (!widgetMode)
+        {
+            HourPips.Visibility = HourPips.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            PipsLabel.Visibility = PipsLabel.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
     }
 
     void UpdateStats()
@@ -1197,13 +1205,51 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    void ChangeDuration(int delta)
+    void ChangeDuration(int delta) => SetDuration(data.CountdownMinutes + delta);
+
+    void SetDuration(int minutes)
     {
         if (active) return;
-        data.CountdownMinutes = Math.Clamp(data.CountdownMinutes + delta, 5, 180);
+        data.CountdownMinutes = Math.Clamp(minutes, 5, 180);
         Store.Save(data);
+        BuildDurationPresets();
         UpdateAll();
     }
+
+    static readonly int[] DurationChoices = { 15, 25, 30, 45, 60, 90, 120 };
+
+    // Geri sayım'a her tıklamada (zaten seçiliyken de) süre menüsü açılır.
+    void ModeCountdown_Click(object sender, RoutedEventArgs e)
+    {
+        if (active) return;
+        BuildDurationPresets();
+        DurationPopup.IsOpen = true;
+    }
+
+    void DurationDone_Click(object sender, RoutedEventArgs e) => DurationPopup.IsOpen = false;
+
+    // Hazır süreler: seçili olan tema renginde. Birine tıklamak süreyi seçer ve menüyü kapatır.
+    void BuildDurationPresets()
+    {
+        DurationPresets.Children.Clear();
+        foreach (var m in DurationChoices)
+        {
+            bool sel = m == data.CountdownMinutes;
+            var b = new Button
+            {
+                Style = (Style)FindResource(sel ? "Primary" : "Btn"), Margin = new Thickness(4), Padding = new Thickness(0, 7, 0, 7),
+                Width = 78, Content = m >= 60 && m % 60 == 0 ? $"{m / 60} saat" : $"{m} dk"
+            };
+            int pick = m;
+            b.Click += (_, _) => { SetDuration(pick); DurationPopup.IsOpen = false; };
+            DurationPresets.Children.Add(b);
+        }
+    }
+
+    // Menü, Geri sayım düğmesinin tam üstünde ve ortasında açılır.
+    System.Windows.Controls.Primitives.CustomPopupPlacement[] PlaceDurationPopup(Size popup, Size target, Point offset)
+        => new[] { new System.Windows.Controls.Primitives.CustomPopupPlacement(
+            new Point((target.Width - popup.Width) / 2, -popup.Height + 14), System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal) };
 
     // Büyük pencerede çember biraz küçültülür ki düğmeler varsayılan boyda kaydırmadan görünsün.
     static readonly ScaleTransform NormalRingScale = new(0.88, 0.88);
