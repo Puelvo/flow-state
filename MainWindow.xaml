@@ -258,7 +258,7 @@
 
         <!-- İstatistik görünümü -->
         <ScrollViewer x:Name="StatsView" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="40,20,40,36" MaxWidth="860">
+            <StackPanel Margin="40,20,40,36" MaxWidth="880">
                 <StackPanel.Resources>
                     <!-- Grafik boş durum yazısı (çubukların üstünde ortalı) -->
                     <Style x:Key="ChartEmptyText" TargetType="TextBlock">
@@ -383,7 +383,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <DockPanel Margin="16,0,16,8" MaxWidth="860">
+            <DockPanel Margin="16,0,16,8" MaxWidth="880">
                 <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Background="{StaticResource Surface}"
                         VerticalAlignment="Center" ToolTip="Tüm kayıtları CSV dosyası olarak kaydet" Click="Export_Click">
                     <StackPanel Orientation="Horizontal">
@@ -397,13 +397,13 @@
                 </StackPanel>
             </DockPanel>
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="HistoryPanel" MaxWidth="860" Margin="16,4,16,36"/>
+                <StackPanel x:Name="HistoryPanel" MaxWidth="880" Margin="16,4,16,36"/>
             </ScrollViewer>
         </Grid>
 
         <!-- Bahçe görünümü: hayvanat bahçesi ve market (içerik MainWindow.Zoo.cs içinde kurulur) -->
         <ScrollViewer x:Name="ZooView" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="ZooRoot" Margin="40,20,40,36" MaxWidth="860"/>
+            <StackPanel x:Name="ZooRoot" Margin="40,20,40,36" MaxWidth="880"/>
         </ScrollViewer>
 
         <!-- Sosyal görünümü: arkadaşlar ve odalar (içerik MainWindow.Social.cs içinde kurulur) -->
