@@ -75,8 +75,7 @@ public partial class MainWindow
         zooKey = key;
 
         ZooRoot.Children.Clear();
-        zooNodes.Clear();
-        zooCanvas = null;
+        // Bahçe sahnesi (zooCanvas, zooNodes) artık Çalış'ta; Dostlar sayfası yeniden kurulurken ona dokunulmaz.
         zooMarketBtn = null;
         zooMarketBadge = null;
         zooMarketBadgeText = null;
