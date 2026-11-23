@@ -117,29 +117,46 @@ public partial class MainWindow : Window
 
     // ---------- arka plan ----------
 
-    readonly List<(System.Windows.Shapes.Ellipse e, double fx, double fy)> stars = new();
+    readonly List<(FrameworkElement e, double fx, double fy)> stars = new();
+
+    static readonly string[] Confetti = { "#FFB4A2", "#FFD58A", "#A8E6CF", "#B5C7FF", "#F7B2D9", "#C9B6FF" };
 
     void BuildStars()
     {
         var rnd = new Random(7);
-        for (int i = 0; i < 90; i++)
+        var sparkle = (Geometry)FindResource("IconSparkle");
+        for (int i = 0; i < 26; i++)
         {
-            double size = 1 + rnd.NextDouble() * 2;
-            var star = new System.Windows.Shapes.Ellipse
+            var fill = ParseBrush(Confetti[rnd.Next(Confetti.Length)]);
+            FrameworkElement deco;
+            if (rnd.NextDouble() < 0.35)
             {
-                Width = size, Height = size,
-                Fill = Brushes.White, Opacity = 0.1
-            };
-            var anim = new System.Windows.Media.Animation.DoubleAnimation(0.08, 0.35 + rnd.NextDouble() * 0.55,
-                TimeSpan.FromSeconds(1.8 + rnd.NextDouble() * 4))
+                double size = 10 + rnd.NextDouble() * 8;
+                deco = new System.Windows.Shapes.Path { Data = sparkle, Fill = fill, Width = size, Height = size, Stretch = Stretch.Uniform };
+            }
+            else
             {
-                AutoReverse = true,
-                RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever,
-                BeginTime = TimeSpan.FromSeconds(rnd.NextDouble() * 5)
-            };
-            star.BeginAnimation(OpacityProperty, anim);
-            stars.Add((star, rnd.NextDouble(), rnd.NextDouble()));
-            StarCanvas.Children.Add(star);
+                double size = 6 + rnd.NextDouble() * 9;
+                deco = new System.Windows.Shapes.Ellipse { Width = size, Height = size, Fill = fill };
+            }
+            deco.Opacity = 0.45 + rnd.NextDouble() * 0.4;
+            var tt = new TranslateTransform();
+            var rot = new RotateTransform();
+            deco.RenderTransformOrigin = new Point(0.5, 0.5);
+            deco.RenderTransform = new TransformGroup { Children = { rot, tt } };
+            var ease = new System.Windows.Media.Animation.SineEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut };
+            tt.BeginAnimation(TranslateTransform.YProperty, new System.Windows.Media.Animation.DoubleAnimation(-10 - rnd.NextDouble() * 12, 10 + rnd.NextDouble() * 12,
+                TimeSpan.FromSeconds(4 + rnd.NextDouble() * 5))
+            {
+                AutoReverse = true, RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever,
+                BeginTime = TimeSpan.FromSeconds(-rnd.NextDouble() * 6), EasingFunction = ease
+            });
+            if (deco is System.Windows.Shapes.Path)
+                rot.BeginAnimation(RotateTransform.AngleProperty, new System.Windows.Media.Animation.DoubleAnimation(-18, 18,
+                    TimeSpan.FromSeconds(3 + rnd.NextDouble() * 3))
+                { AutoReverse = true, RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever, EasingFunction = ease });
+            stars.Add((deco, rnd.NextDouble(), rnd.NextDouble()));
+            StarCanvas.Children.Add(deco);
         }
         StarCanvas.SizeChanged += (_, _) => PlaceStars();
         Loaded += (_, _) => PlaceStars();
@@ -987,32 +1004,43 @@ public partial class MainWindow : Window
     static Color Lighten(Color c, double t) => Color.FromRgb(
         (byte)(c.R + (255 - c.R) * t), (byte)(c.G + (255 - c.G) * t), (byte)(c.B + (255 - c.B) * t));
 
-    // Seçilen tema rengini tüm uygulamaya uygular: vurgu, seçili öğeler, zemin ve arka plan ışıkları.
+    static Color Mix(Color a, Color b, double t) => Color.FromRgb(
+        (byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
+
+    static double Luma(Color c) => (0.299 * c.R + 0.587 * c.G + 0.114 * c.B) / 255.0;
+
+    static readonly Color Cream = Color.FromRgb(0xFF, 0xF9, 0xF1), Peach = Color.FromRgb(0xFD, 0xEB, 0xDD);
+    static readonly Color Cocoa = Color.FromRgb(0x3B, 0x2C, 0x25);
+
+    // Seçilen tema rengini tüm uygulamaya uygular: vurgu ve türevleri, krem zemin ve pastel ışık lekeleri.
     void ApplyTheme()
     {
         var c = WidgetColor();
         var res = Application.Current.Resources;
         res["Accent"] = new SolidColorBrush(c);
-        res["AccentDim"] = new SolidColorBrush(Tint(c, 0.42, 14));
-        res["Sel"] = new SolidColorBrush(Tint(c, 0.30, 22));
-        res["BgGrad"] = new LinearGradientBrush(Tint(c, 0.09, 5), Tint(c, 0.20, 8), new Point(0, 0), new Point(1, 1));
+        res["AccentDim"] = new SolidColorBrush(Lighten(c, 0.58));
+        res["AccentSoft"] = res["Sel"] = new SolidColorBrush(Lighten(c, 0.84));
+        res["AccentDeep"] = new SolidColorBrush(Tint(c, 0.72, 0));
+        // Açık tema renklerinde (sarı, gri) beyaz yazı okunmaz: kakao kullan.
+        res["OnAccent"] = new SolidColorBrush(Luma(c) > 0.72 ? Cocoa : Colors.White);
+        res["BgGrad"] = new LinearGradientBrush(Mix(Cream, c, 0.03), Mix(Peach, c, 0.07), new Point(0, 0), new Point(1, 1));
 
         static void Blob(GradientStop a, GradientStop b, Color col, byte alpha)
         {
             a.Color = Color.FromArgb(alpha, col.R, col.G, col.B);
             b.Color = Color.FromArgb(0, col.R, col.G, col.B);
         }
-        Blob(Blob1A, Blob1B, c, 0x70);
-        Blob(Blob2A, Blob2B, Lighten(c, 0.35), 0x50);
-        Blob(BlobC1, BlobC2, c, 0x78);
-        Blob(Blob4A, Blob4B, Tint(c, 0.75, 0), 0x55);
+        Blob(Blob1A, Blob1B, Lighten(c, 0.55), 0x66);
+        Blob(Blob2A, Blob2B, Color.FromRgb(0xFF, 0xC9, 0xA8), 0x70);
+        Blob(BlobC1, BlobC2, Color.FromRgb(0xFF, 0xE3, 0x9A), 0x6A);
+        Blob(Blob4A, Blob4B, Mix(Color.FromRgb(0xB8, 0xF0, 0xD6), c, 0.25), 0x60);
     }
 
-    // Widget'ta hareketli arka plan (bloblar, yıldızlar) kapalı; yerine seçilen rengin koyu tonu.
+    // Widget'ta hareketli arka plan kapalı; yerine tema rengine hafifçe çalan krem zemin.
     void ApplyWidgetBackground()
     {
         var c = WidgetColor();
-        Background = new LinearGradientBrush(Tint(c, 0.16, 5), Tint(c, 0.06, 3), new Point(0, 0), new Point(1, 1));
+        Background = new LinearGradientBrush(Mix(Cream, c, 0.05), Mix(Peach, c, 0.12), new Point(0, 0), new Point(1, 1));
     }
 
     // ---------- yuvarlak düğme ikonları ----------

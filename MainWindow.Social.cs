@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -628,13 +628,10 @@ public partial class MainWindow
         socialBadgeText = new TextBlock { Foreground = Brushes.White, FontSize = 10, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         socialBadge = new Border
         {
-            Background = ParseBrush("#E5484D"), CornerRadius = new CornerRadius(9), MinWidth = 18, Height = 18, Padding = new Thickness(5, 0, 5, 0),
+            Background = Res("Danger"), CornerRadius = new CornerRadius(9), MinWidth = 18, Height = 18, Padding = new Thickness(5, 0, 5, 0),
             Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed, Child = socialBadgeText
         };
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
-        panel.Children.Add(new TextBlock { Text = "Sosyal" });
-        panel.Children.Add(socialBadge);
-        NavSocial.Content = panel;
+        NavSocialPanel.Children.Add(socialBadge);
 
         pendingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(45) };
         pendingTimer.Tick += (_, _) => _ = CheckPending();
