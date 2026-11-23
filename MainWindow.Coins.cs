@@ -158,12 +158,12 @@ public partial class MainWindow
             var sc = new ScaleTransform(0.3, 0.3);
             coin.RenderTransformOrigin = new Point(0.5, 0.5);
             coin.RenderTransform = new TransformGroup { Children = { sc, tt } };
-            FxLayer.Children.Add(coin);
+            FxLayer.Children.Insert(0, coin); // kartın arkasında doğar, yazının üstünü kapatmaz
 
-            // 1) Saçılma: rastgele yöne, hafif yukarı ağırlıklı.
-            double ang = fxRnd.NextDouble() * Math.PI * 2;
-            double r = (widgetMode ? 40 : 80) + fxRnd.NextDouble() * (widgetMode ? 30 : 70);
-            double bx = from.X + Math.Cos(ang) * r - size / 2, by = from.Y + Math.Sin(ang) * r * 0.8 - 30 - size / 2;
+            // 1) Saçılma: kartın çevresine, eşit aralıklı yönlere (biraz rastgele), hafif yukarı ağırlıklı.
+            double ang = (i + fxRnd.NextDouble() * 0.6) / n * Math.PI * 2;
+            double r = (widgetMode ? 95 : 185) + fxRnd.NextDouble() * (widgetMode ? 25 : 45);
+            double bx = from.X + Math.Cos(ang) * r - size / 2, by = from.Y + Math.Sin(ang) * r * 0.75 - 20 - size / 2;
             var burst = TimeSpan.FromSeconds(0.45);
             var outEase = new CubicEase { EasingMode = EasingMode.EaseOut };
             tt.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(bx, burst) { EasingFunction = outEase });
