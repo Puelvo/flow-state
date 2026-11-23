@@ -408,67 +408,236 @@
 
         <!-- Sosyal görünümü: arkadaşlar ve odalar (içerik MainWindow.Social.cs içinde kurulur) -->
         <ScrollViewer x:Name="SocialView" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="SocialRoot" Margin="40,20,40,36" MaxWidth="860"/>
+            <ScrollViewer.Resources>
+                <!-- Bu sayfadaki onay kutuları: yuvarlak, kayan bir anahtar -->
+                <Style TargetType="CheckBox">
+                    <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <Setter Property="FontSize" Value="13"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="CheckBox">
+                                <StackPanel Orientation="Horizontal" Background="Transparent">
+                                    <Grid Width="44" Height="26" VerticalAlignment="Center">
+                                        <Border x:Name="track" CornerRadius="13" Background="{StaticResource Track}"/>
+                                        <Ellipse x:Name="knob" Width="20" Height="20" Fill="#FFFFFF" HorizontalAlignment="Left" Margin="3,0,3,0">
+                                            <Ellipse.Effect>
+                                                <DropShadowEffect BlurRadius="4" ShadowDepth="1" Direction="270" Opacity="0.25" Color="#B07A55"/>
+                                            </Ellipse.Effect>
+                                        </Ellipse>
+                                    </Grid>
+                                    <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter TargetName="track" Property="Background" Value="{DynamicResource Accent}"/>
+                                        <Setter TargetName="knob" Property="HorizontalAlignment" Value="Right"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="track" Property="Opacity" Value="0.85"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Opacity" Value="0.5"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ScrollViewer.Resources>
+            <StackPanel x:Name="SocialRoot" Margin="40,20,40,36" MaxWidth="880"/>
         </ScrollViewer>
 
         <!-- Ayarlar görünümü -->
         <ScrollViewer x:Name="SettingsView" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="40,20,40,36" MaxWidth="860">
-                <TextBlock Text="Ayarlar" FontSize="28" FontWeight="Bold"/>
+            <ScrollViewer.Resources>
+                <!--
+                    Tema rengi şekeri (BuildSettings kurar). Background = renk, Foreground = tik rengi,
+                    Tag="sel" seçili olanı işaretler: dış halka + tik görünür. Üzerine gelince hafifçe büyür.
+                -->
+                <Style x:Key="Swatch" TargetType="Button">
+                    <Setter Property="Width" Value="54"/>
+                    <Setter Property="Height" Value="54"/>
+                    <Setter Property="Margin" Value="5"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                    <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Grid x:Name="root" Background="Transparent" RenderTransformOrigin="0.5,0.5">
+                                    <Grid.RenderTransform>
+                                        <ScaleTransform x:Name="sc" ScaleX="1" ScaleY="1"/>
+                                    </Grid.RenderTransform>
+                                    <!-- seçili halka -->
+                                    <Ellipse x:Name="ring" Stroke="{TemplateBinding Background}" StrokeThickness="3" Opacity="0"/>
+                                    <Grid Margin="7">
+                                        <!-- alt dudak -->
+                                        <Ellipse Fill="{TemplateBinding Background}" Margin="0,3,0,0"/>
+                                        <Ellipse Fill="#30502A10" Margin="0,3,0,0"/>
+                                        <Grid x:Name="face" Margin="0,0,0,3">
+                                            <Ellipse Fill="{TemplateBinding Background}"/>
+                                            <Ellipse Width="12" Height="7" Fill="#FFFFFF" Opacity="0.45" HorizontalAlignment="Left"
+                                                     VerticalAlignment="Top" Margin="8,6,0,0" IsHitTestVisible="False"/>
+                                            <Path x:Name="check" Data="M5,12.5 L10,17 L19,7.5" Width="17" Height="13" Stretch="Uniform"
+                                                  Stroke="{TemplateBinding Foreground}" StrokeThickness="3.2" StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round" StrokeLineJoin="Round" Opacity="0" IsHitTestVisible="False"/>
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="Tag" Value="sel">
+                                        <Setter TargetName="ring" Property="Opacity" Value="1"/>
+                                        <Setter TargetName="check" Property="Opacity" Value="1"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Trigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="sc" Storyboard.TargetProperty="ScaleX" To="1.1" Duration="0:0:0.2">
+                                                        <DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut" Amplitude="0.6"/></DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                    <DoubleAnimation Storyboard.TargetName="sc" Storyboard.TargetProperty="ScaleY" To="1.1" Duration="0:0:0.2">
+                                                        <DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut" Amplitude="0.6"/></DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.EnterActions>
+                                        <Trigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="sc" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.2"/>
+                                                    <DoubleAnimation Storyboard.TargetName="sc" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.2"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.ExitActions>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="face" Property="Margin" Value="0,3,0,0"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+                <!-- Kart başlığındaki yuvarlak ikon rozeti -->
+                <Style x:Key="SettingsBadge" TargetType="Grid">
+                    <Setter Property="Width" Value="44"/>
+                    <Setter Property="Height" Value="44"/>
+                    <Setter Property="Margin" Value="0,0,14,0"/>
+                    <Setter Property="VerticalAlignment" Value="Top"/>
+                </Style>
+                <Style x:Key="SettingsLabel" TargetType="TextBlock">
+                    <Setter Property="FontSize" Value="12.5"/>
+                    <Setter Property="FontWeight" Value="ExtraBold"/>
+                    <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+                    <Setter Property="Margin" Value="4,0,0,6"/>
+                </Style>
+            </ScrollViewer.Resources>
+            <StackPanel Margin="40,20,40,36" MaxWidth="880">
+                <TextBlock Text="Ayarlar" Style="{StaticResource PageTitle}"/>
+                <TextBlock Text="Uygulamayı kendine göre süsle, çalışmaların her cihazda seninle olsun." Style="{StaticResource PageSub}"/>
 
-                <TextBlock Text="TEMA RENGİ" Style="{StaticResource H}"/>
-                <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="20,18">
+                <!-- Tema rengi -->
+                <Border Style="{StaticResource Card}" Margin="0,22,0,0">
                     <StackPanel>
-                        <TextBlock Text="Halka, düğmeler, seçili öğeler ve arka plan ışığı bu rengi kullanır. Hem büyük pencerede hem widget'ta geçerlidir."
-                                   Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
-                        <WrapPanel x:Name="SwatchPanel" Margin="-4,14,0,0"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                            <TextBlock Text="Özel renk:" VerticalAlignment="Center" Foreground="{StaticResource Muted}"/>
-                            <TextBox x:Name="HexBox" Width="110" MaxLength="7" TextAlignment="Center" Margin="10,0,0,0"
+                        <DockPanel>
+                            <Grid Style="{StaticResource SettingsBadge}">
+                                <Ellipse Fill="{DynamicResource AccentSoft}"/>
+                                <Path Data="{StaticResource IconSparkle}" Fill="{DynamicResource Accent}" Width="20" Height="20" Stretch="Uniform"/>
+                            </Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Tema rengi" Style="{StaticResource H}" Margin="0"/>
+                                <TextBlock Text="Halka, düğmeler, seçili öğeler ve arka plan ışığı bu rengi kullanır. Hem büyük pencerede hem widget'ta geçerlidir."
+                                           Style="{StaticResource Body}" FontSize="13" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <WrapPanel x:Name="SwatchPanel" Margin="-5,14,0,0"/>
+                        <Border Height="2" CornerRadius="1" Background="{StaticResource Line}" Margin="0,14,0,16"/>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Özel renk" FontWeight="ExtraBold" VerticalAlignment="Center"/>
+                            <TextBox x:Name="HexBox" Width="120" MaxLength="7" TextAlignment="Center" Margin="12,0,0,0" FontWeight="ExtraBold"
                                      KeyDown="HexBox_KeyDown" LostFocus="HexBox_LostFocus"/>
-                            <Border x:Name="HexPreview" Width="36" Height="36" CornerRadius="18" Margin="10,0,0,0"
-                                    BorderBrush="#55FFFFFF" BorderThickness="1"/>
+                            <Border x:Name="HexPreview" Width="40" Height="40" CornerRadius="20" Margin="12,0,0,0"
+                                    BorderBrush="{StaticResource Surface}" BorderThickness="3" Effect="{StaticResource SoftShadow}"/>
+                            <TextBlock Text="Enter'a basınca uygulanır" Style="{StaticResource Body}" FontSize="12.5" VerticalAlignment="Center" Margin="12,0,0,0"/>
                         </StackPanel>
-                        <TextBlock x:Name="HexError" Foreground="#E58A8A" FontSize="12" Margin="0,8,0,0" Visibility="Collapsed"
+                        <TextBlock x:Name="HexError" Foreground="{StaticResource Danger}" FontSize="12.5" FontWeight="Bold" Margin="2,10,0,0" Visibility="Collapsed"
                                    Text="Geçerli bir renk gir (örn. #FF5A6A)."/>
                     </StackPanel>
                 </Border>
 
-                <TextBlock Text="SENKRONİZASYON" Style="{StaticResource H}"/>
-                <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="20,18">
+                <!-- Senkronizasyon -->
+                <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                     <StackPanel>
-                        <TextBlock Text="Telefon ve bilgisayardaki çalışmaların aynı hesapta birleşir. Veriler önce bu cihazda tutulur, internet yokken de çalışır; bağlantı olunca arka planda eşitlenir."
-                                   Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="SyncStatus" Margin="0,12,0,0" Foreground="{StaticResource Accent}" TextWrapping="Wrap"/>
+                        <DockPanel>
+                            <Grid Style="{StaticResource SettingsBadge}">
+                                <Ellipse Fill="{StaticResource GoodSoft}"/>
+                                <Path Data="M7,18.5 L17.5,18.5 C20,18.5 21.5,16.7 21.5,14.5 C21.5,12.3 19.8,10.7 17.7,10.8 C17,8.1 14.7,6.3 12,6.3 C8.9,6.3 6.4,8.7 6.2,11.7 C4.1,12 2.5,13.6 2.5,15.4 C2.5,17.2 4.2,18.5 7,18.5 Z"
+                                      Stroke="{StaticResource Good}" StrokeThickness="2.2" StrokeLineJoin="Round" Width="22" Height="22" Stretch="Uniform"/>
+                            </Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Senkronizasyon" Style="{StaticResource H}" Margin="0"/>
+                                <TextBlock Text="Telefon ve bilgisayardaki çalışmaların aynı hesapta birleşir. Veriler önce bu cihazda tutulur, internet yokken de çalışır; bağlantı olunca arka planda eşitlenir."
+                                           Style="{StaticResource Body}" FontSize="13" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
 
-                        <StackPanel x:Name="SyncLoginPanel" Margin="0,12,0,0">
-                            <TextBox x:Name="SyncEmail" MaxWidth="360" HorizontalAlignment="Left" Width="360"/>
-                            <PasswordBox x:Name="SyncPassword" Width="360" HorizontalAlignment="Left" Margin="0,8,0,0"
-                                         Background="{StaticResource Panel2}" Foreground="{StaticResource Text}" CaretBrush="{StaticResource Text}"
-                                         BorderThickness="0" Padding="12,9" VerticalContentAlignment="Center" KeyDown="SyncPassword_KeyDown"/>
-                            <TextBlock x:Name="SyncMsg" Foreground="#E58A8A" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-                            <WrapPanel Margin="0,12,0,0">
-                                <Button x:Name="SyncLoginBtn" Content="Giriş yap" Style="{StaticResource Btn}" Margin="0,0,8,0" Click="SyncLogin_Click"/>
+                        <!-- Durum hapı (RefreshSyncUi renklendirir) -->
+                        <Border x:Name="SyncPill" Background="{StaticResource Panel2}" CornerRadius="14" Padding="12,6,14,7"
+                                HorizontalAlignment="Left" Margin="0,16,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse x:Name="SyncDot" Width="9" Height="9" Fill="{StaticResource Faint}" VerticalAlignment="Center" Margin="0,1,8,0"/>
+                                <TextBlock x:Name="SyncStatus" Foreground="{StaticResource Text}" FontWeight="Bold" FontSize="13"
+                                           TextWrapping="Wrap" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel x:Name="SyncLoginPanel" Margin="0,16,0,0">
+                            <TextBlock Text="E-posta" Style="{StaticResource SettingsLabel}"/>
+                            <TextBox x:Name="SyncEmail" HorizontalAlignment="Left" Width="360"/>
+                            <TextBlock Text="Şifre" Style="{StaticResource SettingsLabel}" Margin="4,12,0,6"/>
+                            <PasswordBox x:Name="SyncPassword" Width="360" HorizontalAlignment="Left" KeyDown="SyncPassword_KeyDown"/>
+                            <TextBlock x:Name="SyncMsg" Foreground="{StaticResource Danger}" FontSize="12.5" FontWeight="Bold" Margin="2,10,0,0"
+                                       TextWrapping="Wrap" Visibility="Collapsed"/>
+                            <WrapPanel Margin="0,16,0,0">
+                                <Button x:Name="SyncLoginBtn" Content="Giriş yap" Style="{StaticResource Primary}" Margin="0,0,10,0" Click="SyncLogin_Click"/>
                                 <Button x:Name="SyncSignupBtn" Content="Kayıt ol" Style="{StaticResource Btn}" Click="SyncSignup_Click"/>
                             </WrapPanel>
                         </StackPanel>
 
-                        <WrapPanel x:Name="SyncAccountPanel" Margin="0,12,0,0" Visibility="Collapsed">
-                            <Button Content="Şimdi senkronla" Style="{StaticResource Btn}" Margin="0,0,8,0" Click="SyncNow_Click"/>
-                            <Button Content="Çıkış yap" Style="{StaticResource Btn}" Foreground="#E58A8A" Click="SyncLogout_Click"/>
+                        <WrapPanel x:Name="SyncAccountPanel" Margin="0,16,0,0" Visibility="Collapsed">
+                            <Button Style="{StaticResource Primary}" Margin="0,0,10,0" Click="SyncNow_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M19,12 A7,7 0 1 1 16.9,7 M17.5,3.5 L17.5,7.5 L13.5,7.5" Style="{StaticResource Icon}" Width="15" Height="15"/>
+                                    <TextBlock Text="Şimdi senkronla" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Content="Çıkış yap" Style="{StaticResource DangerBtn}" Click="SyncLogout_Click"/>
                         </WrapPanel>
                     </StackPanel>
                 </Border>
 
-                <TextBlock Text="SÜRELERİ SIFIRLA" Style="{StaticResource H}"/>
-                <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="20,18">
+                <!-- Süreleri sıfırla -->
+                <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                     <StackPanel>
-                        <TextBlock Text="Seçtiğin dönemdeki tüm çalışma kayıtları silinir. Bu işlem geri alınamaz."
-                                   Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
-                        <WrapPanel Margin="0,14,0,0">
-                            <Button Content="Bugünü sıfırla" Tag="today" Style="{StaticResource Btn}" Foreground="#E58A8A" Margin="0,0,8,8" Click="ResetPeriod_Click"/>
-                            <Button Content="Bu haftayı sıfırla" Tag="week" Style="{StaticResource Btn}" Foreground="#E58A8A" Margin="0,0,8,8" Click="ResetPeriod_Click"/>
-                            <Button Content="Bu ayı sıfırla" Tag="month" Style="{StaticResource Btn}" Foreground="#E58A8A" Margin="0,0,8,8" Click="ResetPeriod_Click"/>
+                        <DockPanel>
+                            <Grid Style="{StaticResource SettingsBadge}">
+                                <Ellipse Fill="{StaticResource DangerSoft}"/>
+                                <Path Data="{StaticResource IconTrash}" Style="{StaticResource Icon}" Stroke="{StaticResource Danger}" Width="20" Height="20"/>
+                            </Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Süreleri sıfırla" Style="{StaticResource H}" Margin="0"/>
+                                <TextBlock Text="Seçtiğin dönemdeki tüm çalışma kayıtları silinir. Bu işlem geri alınamaz."
+                                           Style="{StaticResource Body}" FontSize="13" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <WrapPanel Margin="0,16,0,0">
+                            <Button Content="Bugünü sıfırla" Tag="today" Style="{StaticResource DangerBtn}" Margin="0,0,10,8" Click="ResetPeriod_Click"/>
+                            <Button Content="Bu haftayı sıfırla" Tag="week" Style="{StaticResource DangerBtn}" Margin="0,0,10,8" Click="ResetPeriod_Click"/>
+                            <Button Content="Bu ayı sıfırla" Tag="month" Style="{StaticResource DangerBtn}" Margin="0,0,10,8" Click="ResetPeriod_Click"/>
                         </WrapPanel>
                     </StackPanel>
                 </Border>

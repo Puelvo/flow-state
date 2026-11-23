@@ -88,6 +88,9 @@ public partial class MainWindow : Window
     {
         if (sync == null) return;
         SyncStatus.Text = sync.SignedIn ? $"{sync.Email} · {sync.Status}" : sync.Status;
+        // Durum hapı: girişliyse yeşil, değilse sade
+        SyncPill.Background = Res(sync.SignedIn ? "GoodSoft" : "Panel2");
+        SyncDot.Fill = Res(sync.SignedIn ? "Good" : "Faint");
         SyncLoginPanel.Visibility = sync.SignedIn ? Visibility.Collapsed : Visibility.Visible;
         SyncAccountPanel.Visibility = sync.SignedIn ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -1233,8 +1236,20 @@ public partial class MainWindow : Window
 
     bool widgetOnTop = false; // varsayılan: widget diğer pencerelerin altında kalır (📌 ile üste sabitlenir)
 
+    // Krem zeminde neşeli duran şeker renkleri. Varsayılan mavi (#5B8CFF) mevcut kullanıcılar için listede kalır.
     static readonly string[] SwatchColors =
-        { "#5B8CFF", "#FF5A6A", "#3DDC97", "#A78BFA", "#FFB04D", "#FF6FB5", "#2DD4D4", "#E5E7EB" };
+    {
+        "#5B8CFF", // mavi (varsayılan)
+        "#4CB8F5", // gök mavisi
+        "#22B8B0", // turkuaz
+        "#3CCB8E", // nane
+        "#F5C33B", // güneş sarısı
+        "#FFA94D", // mango
+        "#FF7A6B", // mercan
+        "#FF7EB6", // pembe
+        "#A78BFA", // lavanta
+        "#9C6B53", // kakao
+    };
 
     Color WidgetColor()
     {
@@ -1328,38 +1343,42 @@ public partial class MainWindow : Window
 
     // ---------- ayarlar ----------
 
-    void BuildSettings()
+    // Tema rengi şekerleri SettingsView kaynaklarındaki "Swatch" stiliyle çizilir (seçili halka, tik, üzerine gelince büyüme).
+    // bounce: yeni seçilen şeker küçük bir zıplamayla belirir.
+    void BuildSettings(bool bounce = false)
     {
         SwatchPanel.Children.Clear();
         var cur = WidgetColor();
+        var style = (Style)SettingsView.Resources["Swatch"];
         foreach (var hex in SwatchColors)
         {
             var col = (Color)ColorConverter.ConvertFromString(hex);
             bool selected = col == cur;
             var dot = new Button
             {
-                Width = 38, Height = 38, Margin = new Thickness(4), Cursor = Cursors.Hand, Tag = hex,
-                ToolTip = hex,
-                Template = SwatchTemplate(col, selected)
+                Style = style, Tag = selected ? "sel" : hex, ToolTip = hex,
+                Background = new SolidColorBrush(col),
+                Foreground = new SolidColorBrush(Luma(col) > 0.72 ? Cocoa : Colors.White) // tik rengi
             };
             dot.Click += (_, _) => SetWidgetColor(hex);
             SwatchPanel.Children.Add(dot);
+            if (selected && bounce) SwatchBounce(dot);
         }
         HexBox.Text = data.WidgetColor.ToUpperInvariant();
         HexPreview.Background = new SolidColorBrush(cur);
         HexError.Visibility = Visibility.Collapsed;
     }
 
-    static ControlTemplate SwatchTemplate(Color col, bool selected)
+    static void SwatchBounce(FrameworkElement el)
     {
-        var tpl = new ControlTemplate(typeof(Button));
-        var root = new FrameworkElementFactory(typeof(Border));
-        root.SetValue(Border.CornerRadiusProperty, new CornerRadius(19));
-        root.SetValue(Border.BackgroundProperty, new SolidColorBrush(col));
-        root.SetValue(Border.BorderThicknessProperty, new Thickness(selected ? 3 : 1));
-        root.SetValue(Border.BorderBrushProperty, new SolidColorBrush(selected ? Colors.White : Color.FromArgb(0x55, 255, 255, 255)));
-        tpl.VisualTree = root;
-        return tpl;
+        var sc = new ScaleTransform(1, 1);
+        el.RenderTransform = sc;
+        var a = new System.Windows.Media.Animation.DoubleAnimation(0.7, 1, TimeSpan.FromSeconds(0.45))
+        {
+            EasingFunction = new System.Windows.Media.Animation.ElasticEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut, Oscillations = 2, Springiness = 4 }
+        };
+        sc.BeginAnimation(ScaleTransform.ScaleXProperty, a);
+        sc.BeginAnimation(ScaleTransform.ScaleYProperty, a);
     }
 
     void SetWidgetColor(string hex)
@@ -1368,7 +1387,7 @@ public partial class MainWindow : Window
         Save();
         ApplyTheme();
         UpdateAll();
-        BuildSettings();
+        BuildSettings(true);
     }
 
     void ApplyHex()
