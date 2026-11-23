@@ -130,7 +130,7 @@
                     <RadioButton x:Name="NavZoo" GroupName="nav" Style="{StaticResource Nav}" Checked="Nav_Checked">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconPaw}" Style="{StaticResource Icon}" StrokeThickness="2"/>
-                            <TextBlock Text="Bahçe" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Dostlar" Margin="7,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                     </RadioButton>
                     <RadioButton x:Name="NavSocial" GroupName="nav" Style="{StaticResource Nav}" Checked="Nav_Checked">
@@ -159,73 +159,85 @@
         </Grid>
 
         <!-- Çalışma görünümü: ders chip'leri, beyaz bir disk üstünde ilerleme çemberi, büyük süre, saat yıldızları, şeker düğmeler -->
-        <ScrollViewer x:Name="TimerView" Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="TimerPanel" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24,4,24,20" MaxWidth="760">
+        <!--
+            Çalış: bahçenin kendisi. Arkada gökyüzü + tepeler + çimen + hayvanlar ve gezgin (SunScene, MainWindow.Sun.cs kurar);
+            önde güneş saat (gökyüzünde) ve çimenin üstünde düğmeler. Renkler günün saatine ya da seçilen temaya göre değişir.
+        -->
+        <Grid x:Name="TimerView" Grid.Row="1" ClipToBounds="True">
+            <Grid x:Name="SunScene"/>
 
-                <TextBlock x:Name="TimerHello" Text="Bugün neye odaklanıyoruz?" Style="{StaticResource PageSub}"
-                           HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,8"/>
+            <Grid x:Name="TimerPanel" Margin="24,4,24,18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <ListBox x:Name="CourseList" HorizontalAlignment="Center" SelectionChanged="CourseList_SelectionChanged">
-                    <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel HorizontalAlignment="Center"/>
-                        </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                </ListBox>
-
-                <!-- Araç satırı: ders ekle / sil -->
-                <WrapPanel HorizontalAlignment="Center" Margin="0,4,0,0">
-                    <StackPanel x:Name="CourseTools" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Style="{StaticResource Ghost}" FontSize="12" Padding="10,5" Click="ToggleAdd_Click">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconPlus}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.6"/>
-                                <TextBlock Text="Ders ekle" Margin="5,0,0,0" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="DeleteCourseBtn" Style="{StaticResource Ghost}" FontSize="12" Padding="10,5" Margin="4,0,0,0"
-                                Foreground="{StaticResource Danger}" Click="DeleteCourse_Click">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconTrash}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.4"/>
-                                <TextBlock Text="Dersi sil" Margin="5,0,0,0" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-
-                    <!-- Yeni ders: küçük beyaz kart -->
-                </WrapPanel>
-
-                <Border x:Name="AddPanel" Style="{StaticResource Card}" HorizontalAlignment="Center" Margin="0,8,0,0"
-                        Padding="10" CornerRadius="20" Visibility="Collapsed">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBox x:Name="NewCourseBox" Width="220" MaxLength="40" KeyDown="NewCourseBox_KeyDown"
-                                 ToolTip="Ders adını yaz, Enter ile ekle"/>
-                        <Button Content="Ekle" Style="{StaticResource Primary}" Padding="16,8" Margin="8,0,0,0" Click="AddCourse_Click"/>
-                    </StackPanel>
-                </Border>
+                <!-- Üst: dersler (gökyüzünde beyaz chip'ler) -->
+                <StackPanel x:Name="TopRow" Grid.Row="0" HorizontalAlignment="Center" MaxWidth="820">
+                    <TextBlock x:Name="TimerHello" Visibility="Collapsed"/>
+                    <ListBox x:Name="CourseList" HorizontalAlignment="Center" SelectionChanged="CourseList_SelectionChanged">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel HorizontalAlignment="Center"/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                    </ListBox>
+                    <!-- Ders ekle / sil: gökyüzünde okunsun diye beyaz hapın içinde -->
+                    <Border x:Name="ToolsBar" HorizontalAlignment="Center" Margin="0,2,0,0" CornerRadius="16" Padding="4,2"
+                            Background="#B8FFFFFF">
+                        <StackPanel x:Name="CourseTools" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{StaticResource Ghost}" FontSize="12" Padding="10,5" Click="ToggleAdd_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="{StaticResource IconPlus}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.6"/>
+                                    <TextBlock Text="Ders ekle" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="DeleteCourseBtn" Style="{StaticResource Ghost}" FontSize="12" Padding="10,5" Margin="4,0,0,0"
+                                    Foreground="{StaticResource Danger}" Click="DeleteCourse_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="{StaticResource IconTrash}" Style="{StaticResource Icon}" Width="12" Height="12" StrokeThickness="2.4"/>
+                                    <TextBlock Text="Dersi sil" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="AddPanel" Style="{StaticResource Card}" HorizontalAlignment="Center" Margin="0,8,0,0"
+                            Padding="10" CornerRadius="20" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBox x:Name="NewCourseBox" Width="220" MaxLength="40" KeyDown="NewCourseBox_KeyDown"
+                                     ToolTip="Ders adını yaz, Enter ile ekle"/>
+                            <Button Content="Ekle" Style="{StaticResource Primary}" Padding="16,8" Margin="8,0,0,0" Click="AddCourse_Click"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
 
                 <!--
-                    Çember: beyaz, gölgeli bir disk; üstünde yumuşak iz halkası ve tema renginde kalın ilerleme yayı (RingArc, kodda çizilir).
-                    Ortada dersin renginde pastel bir yüz (RingFace) var; oturum sürerken yavaşça "nefes alır".
+                    Güneş saat: gökyüzündeki güneş (gece ay). Çevresindeki ışık halkası (RingArc) ilerlemeyi, içindeki yazı süreyi gösterir.
+                    Renkleri gün döngüsünden gelir (ApplySunPalette).
                 -->
-                <Grid x:Name="RingHost" Width="320" Height="320" Margin="0,10,0,0" HorizontalAlignment="Center"
+                <Grid x:Name="RingHost" Grid.Row="1" Width="320" Height="320" Margin="0,6,0,0" HorizontalAlignment="Center"
                       Background="Transparent" Cursor="Hand" ToolTip="Başlat / duraklat"
                       PreviewMouseLeftButtonDown="Ring_Down" MouseMove="Ring_Move" MouseLeftButtonUp="Ring_Up">
-                    <Ellipse Fill="{StaticResource Surface}" Effect="{StaticResource SoftShadow}"/>
-                    <Ellipse x:Name="RingFace" Width="236" Height="236" Fill="{StaticResource Panel2}"
-                             Stroke="{StaticResource Line}" StrokeThickness="2.5" StrokeDashArray="0.01 2.8"
+                    <Ellipse x:Name="SunGlow" Margin="-34" IsHitTestVisible="False"/>
+                    <Grid Width="300" Height="300">
+                        <Ellipse x:Name="SunTrack" Width="300" Height="300" Stroke="#55FFFFFF" StrokeThickness="20"/>
+                        <Canvas x:Name="RingArc" Width="300" Height="300" Visibility="Collapsed"/>
+                    </Grid>
+                    <Ellipse x:Name="RingFace" Width="244" Height="244" StrokeThickness="3" StrokeDashArray="0.01 2.6"
                              StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
                         <Ellipse.RenderTransform><ScaleTransform x:Name="RingFaceScale"/></Ellipse.RenderTransform>
                     </Ellipse>
-                    <Grid Width="300" Height="300">
-                        <Ellipse Width="300" Height="300" Stroke="{StaticResource Track}" StrokeThickness="20"/>
-                        <Canvas x:Name="RingArc" Width="300" Height="300" Visibility="Collapsed"/>
-                    </Grid>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="200">
-                        <TextBlock x:Name="TimerCourseName" Text="Bir ders seç" FontSize="22" FontWeight="Black"
+                        <TextBlock x:Name="TimerCourseName" Text="Bir ders seç" FontSize="20" FontWeight="Black"
                                    Foreground="{StaticResource Text}"
-                                   TextAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="68"/>
+                                   TextAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="56"/>
+                        <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="40" FontWeight="Black" Foreground="{StaticResource Text}"
+                                   Typography.NumeralAlignment="Tabular" HorizontalAlignment="Center" Margin="0,0,0,2"/>
                         <!-- Durum rozeti: hazır / odakta / mola -->
-                        <Border x:Name="StatusPill" HorizontalAlignment="Center" Margin="0,6,0,0" Padding="10,3,12,4"
+                        <Border x:Name="StatusPill" HorizontalAlignment="Center" Margin="0,2,0,0" Padding="10,3,12,4"
                                 CornerRadius="12" Background="{StaticResource Panel2}">
                             <StackPanel Orientation="Horizontal">
                                 <Ellipse x:Name="TimerStatusDot" Width="8" Height="8" Fill="{StaticResource Good}"
@@ -234,55 +246,55 @@
                                            VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
-                        <!-- Gezgin: odaklanırken çemberin içinde yürür (MainWindow.Explorer.cs) -->
-                        <Image x:Name="RingWalker" Width="92" Height="92" Margin="0,6,0,0" HorizontalAlignment="Center"
-                               RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False"/>
+                        <!-- Eski: çemberdeki gezgin. Gezgin artık bahçede yürür; bu görsel gizli kalır. -->
+                        <Image x:Name="RingWalker" Width="0" Height="0" Visibility="Collapsed" IsHitTestVisible="False"/>
                     </StackPanel>
                 </Grid>
 
-                <!-- Çalışma süresi (çemberin altında): büyük ve kalın -->
-                <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="42" FontWeight="Black" Foreground="{StaticResource Text}"
-                           Typography.NumeralAlignment="Tabular" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                <!-- Saat yıldızları: gökyüzünde, okunsun diye yarı saydam beyaz hapın içinde -->
+                <Border x:Name="PipsBar" Grid.Row="2" HorizontalAlignment="Center" Margin="0,4,0,0" CornerRadius="14" Padding="12,4,12,5"
+                        Background="#A6FFFFFF">
+                    <StackPanel>
+                        <StackPanel x:Name="HourPips" Orientation="Horizontal" HorizontalAlignment="Center" Height="18"/>
+                        <TextBlock x:Name="PipsLabel" Foreground="{StaticResource Text}" FontSize="13" FontWeight="ExtraBold"
+                                   HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Border>
 
-                <!-- Tamamlanan saatler: her saat için altın bir yıldızcık, süren saat için boş yıldız -->
-                <StackPanel x:Name="HourPips" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0" Height="18"/>
-                <TextBlock x:Name="PipsLabel" Foreground="{StaticResource Muted}" FontSize="14" FontWeight="Bold"
-                           HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                <!-- Alt: çimenin üstünde mod seçici ve düğmeler -->
+                <StackPanel x:Name="BottomRow" Grid.Row="4" HorizontalAlignment="Center">
+                    <StackPanel x:Name="ModePanel" HorizontalAlignment="Center" Margin="0,14,0,0">
+                        <Border x:Name="ModeBar" Style="{StaticResource SegBar}" Padding="4">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="ModeStopwatch" GroupName="timermode" Style="{StaticResource Seg}" IsChecked="True" Checked="Mode_Checked"
+                                             ToolTip="Süre ileri doğru sayar; istediğin zaman bitir">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="{StaticResource IconTimer}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
+                                        <TextBlock Text="Kronometre" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton x:Name="ModeCountdown" GroupName="timermode" Style="{StaticResource Seg}" Checked="Mode_Checked"
+                                             Click="ModeCountdown_Click" ToolTip="Süre seç; süre dolunca oturum kendiliğinden biter">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="{StaticResource IconHourglass}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
+                                        <TextBlock x:Name="CountdownLabel" Text="Geri sayım" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </RadioButton>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
 
-                <!-- Mod seçici: başlat/bitir düğmelerinin hemen üstünde; oturum başlayınca gizlenir.
-                     Geri sayım'a tıklanınca süre kadranı (DialLayer, MainWindow.Dial.cs) açılır. -->
-                <StackPanel x:Name="ModePanel" HorizontalAlignment="Center" Margin="0,14,0,0">
-                    <Border x:Name="ModeBar" Style="{StaticResource SegBar}" Padding="4">
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton x:Name="ModeStopwatch" GroupName="timermode" Style="{StaticResource Seg}" IsChecked="True" Checked="Mode_Checked"
-                                         ToolTip="Süre ileri doğru sayar; istediğin zaman bitir">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconTimer}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
-                                    <TextBlock Text="Kronometre" Margin="6,0,0,0" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="ModeCountdown" GroupName="timermode" Style="{StaticResource Seg}" Checked="Mode_Checked"
-                                         Click="ModeCountdown_Click" ToolTip="Süre seç; süre dolunca oturum kendiliğinden biter">
-                                <StackPanel Orientation="Horizontal">
-                                    <Path Data="{StaticResource IconHourglass}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
-                                    <TextBlock x:Name="CountdownLabel" Text="Geri sayım" Margin="6,0,0,0" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </RadioButton>
-                        </StackPanel>
-                    </Border>
-
+                    <StackPanel x:Name="BtnRow" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,14,0,0">
+                        <Button x:Name="StartBtn" Style="{StaticResource Round}" Width="92" Height="92" VerticalAlignment="Center"
+                                Background="{DynamicResource Accent}" Foreground="{DynamicResource OnAccent}" Margin="0,0,18,0"
+                                ToolTip="Başlat / duraklat (Boşluk)" Click="StartBtn_Click"/>
+                        <Button x:Name="FinishBtn" Style="{StaticResource Round}" Width="72" Height="72" VerticalAlignment="Center"
+                                Background="{StaticResource DangerSoft}" Foreground="{StaticResource Danger}"
+                                ToolTip="Oturumu bitir ve kaydet" Click="FinishBtn_Click"/>
+                    </StackPanel>
                 </StackPanel>
-
-                <StackPanel x:Name="BtnRow" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,14,0,0">
-                    <Button x:Name="StartBtn" Style="{StaticResource Round}" Width="92" Height="92" VerticalAlignment="Center"
-                            Background="{DynamicResource Accent}" Foreground="{DynamicResource OnAccent}" Margin="0,0,18,0"
-                            ToolTip="Başlat / duraklat (Boşluk)" Click="StartBtn_Click"/>
-                    <Button x:Name="FinishBtn" Style="{StaticResource Round}" Width="72" Height="72" VerticalAlignment="Center"
-                            Background="{StaticResource DangerSoft}" Foreground="{StaticResource Danger}"
-                            ToolTip="Oturumu bitir ve kaydet" Click="FinishBtn_Click"/>
-                </StackPanel>
-            </StackPanel>
-        </ScrollViewer>
+            </Grid>
+        </Grid>
 
         <!-- İstatistik görünümü -->
         <ScrollViewer x:Name="StatsView" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
@@ -594,6 +606,24 @@
                         </StackPanel>
                         <TextBlock x:Name="HexError" Foreground="{StaticResource Danger}" FontSize="12.5" FontWeight="Bold" Margin="2,10,0,0" Visibility="Collapsed"
                                    Text="Geçerli bir renk gir (örn. #FF5A6A)."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Bahçe teması: Çalış'taki bahçenin vakti (BuildGardenThemeTiles kurar) -->
+                <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                    <StackPanel>
+                        <DockPanel>
+                            <Grid Style="{StaticResource SettingsBadge}">
+                                <Ellipse Fill="{StaticResource WarnSoft}"/>
+                                <Ellipse Width="18" Height="18" Fill="{StaticResource Coin}"/>
+                            </Grid>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Bahçe teması" Style="{StaticResource H}" Margin="0"/>
+                                <TextBlock Text="Otomatik'te bahçe günün saatine göre değişir: şafak, gündüz, gün batımı ve yıldızlı gece. İstersen bir vakti sabitle."
+                                           Style="{StaticResource Body}" FontSize="13" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <WrapPanel x:Name="GardenThemePanel" Margin="0,16,0,0"/>
                     </StackPanel>
                 </Border>
 

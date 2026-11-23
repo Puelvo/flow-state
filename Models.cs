@@ -91,6 +91,9 @@ public class AppData
     // Geri sayımla başlatılmış süren seansın kimliği ve hedefi (yeniden açılışta hedef kaybolmasın).
     public string CountdownRunId { get; set; } = "";
     public int CountdownSeconds { get; set; }
+
+    // Bahçe teması (yalnız bu cihazda): "auto" günün saatine göre; "dawn" / "day" / "sunset" / "night" sabit.
+    public string GardenTheme { get; set; } = "auto";
 }
 
 public static class Store

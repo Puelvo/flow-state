@@ -124,8 +124,6 @@ public partial class MainWindow
             row.Children.Add(text);
             stack.Children.Add(row);
         }
-        else if (data.OwnedAnimals.Count > 0)
-            stack.Children.Add(Line("Gezgin bahçeye doğru yola çıktı", 12.5, FontWeights.Bold, "Muted", 10));
 
         var card = new Border
         {
@@ -169,9 +167,11 @@ public partial class MainWindow
     /// <summary>Jetonlar merkezden saçılır, kısa bir duraksamadan sonra Bahçe sekmesine uçar.</summary>
     void BurstCoins(Point from, int n, int total)
     {
-        bool toNav = !widgetMode && NavZoo.IsVisible;
-        Point target = toNav
-            ? NavZoo.TranslatePoint(new Point(NavZoo.ActualWidth / 2, NavZoo.ActualHeight / 2), FxLayer)
+        // Hedef: Çalış'taki jeton hapı; o görünmüyorsa Dostlar sekmesi; widget'ta yukarı uçup kaybolur.
+        FrameworkElement? dest = !widgetMode && sceneCoinPill is { IsVisible: true } ? sceneCoinPill : !widgetMode && NavZoo.IsVisible ? NavZoo : null;
+        bool toNav = dest != null;
+        Point target = dest != null
+            ? dest.TranslatePoint(new Point(dest.ActualWidth / 2, dest.ActualHeight / 2), FxLayer)
             : new Point(from.X, from.Y - 160);
         int arrived = 0;
         double size = widgetMode ? 16 : 24;
@@ -208,7 +208,7 @@ public partial class MainWindow
                 FxLayer.Children.Remove(coin);
                 if (!toNav) return;
                 arrived++;
-                PulseNavZoo();
+                if (dest == sceneCoinPill && sceneCoinPop != null) Pop(sceneCoinPop, 1.15); else PulseNavZoo();
                 if (arrived == n) FloatAtNav(target, $"+{total}");
             };
             if (!toNav) coin.BeginAnimation(OpacityProperty, new DoubleAnimation(0, fly) { BeginTime = delay });

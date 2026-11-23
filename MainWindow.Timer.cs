@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -36,20 +36,8 @@ public partial class MainWindow
         TimerStatusDot.SetResourceReference(Shape.FillProperty, dot);
     }
 
-    string? ringFaceFor;
-
-    // Çemberin ortası seçili dersin rengine çalan çok açık bir pastel; kenarında noktalı bir süs halkası.
-    void UpdateRingFace(Course? course)
-    {
-        var hex = course?.Color ?? "";
-        if (hex == ringFaceFor) return;
-        ringFaceFor = hex;
-        Color c;
-        try { c = (Color)ColorConverter.ConvertFromString(hex); }
-        catch { RingFace.SetResourceReference(Shape.FillProperty, "Panel2"); RingFace.SetResourceReference(Shape.StrokeProperty, "Line"); return; }
-        RingFace.Fill = new SolidColorBrush(Mix(Lighten(c, 0.9), Cream, 0.3));
-        RingFace.Stroke = new SolidColorBrush(Lighten(c, 0.55));
-    }
+    // Güneş saatin yüzü artık vaktin güneşi/ayıdır (ApplySunPalette); ders rengi chip'lerde görünür.
+    void UpdateRingFace(Course? course) { }
 
     bool breathing;
 

@@ -2,8 +2,8 @@
 
 public enum WanderState { Idle, Walk, Greet }
 
-/// <summary>Gezginin bahçe ziyaretinin evresi.</summary>
-public enum VisitPhase { None, Enter, Stay, Leave }
+/// <summary>Bahçenin havası: oturuma göre. Çalışırken sakin, molada oyunbaz.</summary>
+public enum ZooMood { Free, Calm, Play }
 
 /// <summary>Dururken alınan poz. Sıra, poz şeridindeki kare sırasıyla aynıdır (&lt;id&gt;_poses.png).</summary>
 public enum ZooPose { Stand, Sit, Sleep, Eat, Happy }
@@ -48,10 +48,13 @@ public sealed class ZooWorld
 
     public readonly List<Wanderer> Animals = new();
 
-    /// <summary>Bahçeyi ziyaret eden gezgin (oturum bitince gelir). Hayvan listesinde değildir.</summary>
-    public Wanderer? Visitor;
-    public VisitPhase Visit = VisitPhase.None;
-    public const double VisitorSpeed = 72, StaySeconds = 13;
+    /// <summary>Bahçede hep olan gezgin (kullanıcı). Hayvan listesinde değildir.</summary>
+    public readonly Wanderer Keeper = new() { Id = "explorer" };
+    public ZooMood Mood = ZooMood.Free;
+    public bool Night;                     // gece: hayvanlar uykucu
+    public bool KeeperWalking;             // çalışırken gezgin çimende dolaşır
+    public double Celebrating;             // > 0: hayvanlar gezginin etrafında (oturum bitti)
+    public const double KeeperSpeed = 34, CelebrateSeconds = 11;
     public double Width, Height;
     readonly Random rng = new();
 
@@ -78,49 +81,54 @@ public sealed class ZooWorld
         if (w.State == WanderState.Walk && !w.Arriving) { w.State = WanderState.Idle; w.Timer = 1.0; }
     }
 
-    /// <summary>Gezgin soldan girer, ortada durur; hayvanlar etrafına toplanıp selamlar; sonra sağdan çıkar.</summary>
-    public void StartVisit()
+    /// <summary>Oturum bitti: herkes gezginin etrafına toplanıp onu selamlar; gezgin sevinçle zıplar.</summary>
+    public void Celebrate()
     {
-        if (Width <= 0 || Height <= 0) return;
-        double y = (MinY + MaxY) / 2 + Rand(-10, 10);
-        Visitor = new Wanderer
-        {
-            Id = "explorer", X = -Sprite * 0.6, Y = y, TargetX = Width * 0.42, TargetY = y,
-            State = WanderState.Walk, FacingRight = true, Arriving = true
-        };
-        Visit = VisitPhase.Enter;
+        var k = Keeper;
+        if (double.IsNaN(k.X) || Width <= 0) return;
+        k.State = WanderState.Idle; k.Timer = CelebrateSeconds; k.HopT = 0; k.HappyTimer = 2.5;
+        Celebrating = CelebrateSeconds;
+        CallAnimals(k);
     }
 
-    void UpdateVisitor(double dt)
+    void UpdateKeeper(double dt)
     {
-        var v = Visitor;
-        if (v == null) return;
-        if (v.HopT >= 0) { v.HopT += dt / HopSeconds; if (v.HopT >= 1) v.HopT = -1; }
-        if (v.HappyTimer > 0) v.HappyTimer -= dt;
-        switch (Visit)
+        var k = Keeper;
+        if (double.IsNaN(k.X)) { k.X = Width * 0.5; k.Y = (MinY + MaxY) / 2 + 20; k.FacingRight = true; k.Timer = 2; }
+        if (k.HopT >= 0) { k.HopT += dt / HopSeconds; if (k.HopT >= 1) k.HopT = -1; }
+        if (k.HappyTimer > 0) k.HappyTimer -= dt;
+        if (Celebrating > 0)
         {
-            case VisitPhase.Enter:
-            case VisitPhase.Leave:
-                double dx = v.TargetX - v.X, dy = v.TargetY - v.Y, dist = Math.Sqrt(dx * dx + dy * dy), step = VisitorSpeed * dt;
-                v.FacingRight = dx >= 0;
-                v.WalkTime += dt;
-                if (dist > step) { v.X += dx / dist * step; v.Y += dy / dist * step; break; }
-                v.X = v.TargetX; v.Y = v.TargetY;
-                if (Visit == VisitPhase.Leave) { Visitor = null; Visit = VisitPhase.None; return; }
-                Visit = VisitPhase.Stay;
-                v.State = WanderState.Idle; v.Timer = StaySeconds; v.HappyTimer = 2.5; v.HopT = 0;
-                CallAnimals(v);
+            Celebrating -= dt;
+            if (Celebrating <= 0) foreach (var w in Animals) w.Welcoming = false;
+            k.State = WanderState.Idle;
+            return;
+        }
+        switch (k.State)
+        {
+            case WanderState.Walk:
+                double dx = k.TargetX - k.X, dy = k.TargetY - k.Y, dist = Math.Sqrt(dx * dx + dy * dy), step = KeeperSpeed * dt;
+                if (Math.Abs(dx) > 1) k.FacingRight = dx > 0;
+                k.WalkTime += dt;
+                if (dist > step) { k.X += dx / dist * step; k.Y += dy / dist * step; }
+                else { k.X = k.TargetX; k.Y = k.TargetY; k.State = WanderState.Idle; k.Timer = KeeperWalking ? Rand(0.6, 1.6) : Rand(4, 9); }
                 break;
-            case VisitPhase.Stay:
-                v.Timer -= dt;
-                if (v.Timer <= 0)
+            default:
+                k.Timer -= dt;
+                if (k.Timer > 0) break;
+                // Çalışırken çimende uzun uzun yürür; boşta ara sıra birkaç adım atar.
+                if (KeeperWalking || rng.NextDouble() < 0.35)
                 {
-                    Visit = VisitPhase.Leave; v.State = WanderState.Walk;
-                    v.TargetX = Width + Sprite; v.TargetY = v.Y;
-                    foreach (var w in Animals) w.Welcoming = false;
+                    double reach = KeeperWalking ? Rand(120, 320) : Rand(40, 110);
+                    double dir = k.X > Width * 0.7 ? -1 : k.X < Width * 0.3 ? 1 : (rng.Next(2) == 0 ? -1 : 1);
+                    k.TargetX = Math.Clamp(k.X + dir * reach, MinX + 30, MaxX - 30);
+                    k.TargetY = Math.Clamp(k.Y + Rand(-30, 30), MinY + 10, MaxY);
+                    k.State = WanderState.Walk;
                 }
+                else k.Timer = Rand(3, 7);
                 break;
         }
+        k.X = Math.Clamp(k.X, MinX, MaxX); k.Y = Math.Clamp(k.Y, MinY, MaxY);
     }
 
     /// <summary>Herkes (uyuyanlar uyanır) gezginin çevresine, iki yanına yayılarak gelir.</summary>
@@ -142,7 +150,7 @@ public sealed class ZooWorld
     {
         if (Width <= 0 || Height <= 0) return;
         dt = Math.Min(dt, 0.1);
-        UpdateVisitor(dt);
+        UpdateKeeper(dt);
 
         foreach (var w in Animals)
         {
@@ -157,6 +165,7 @@ public sealed class ZooWorld
             {
                 case WanderState.Idle:
                     w.Timer -= dt;
+                    if (Mood == ZooMood.Play && w.HopT < 0 && w.Pose != ZooPose.Sleep && rng.NextDouble() < dt * 0.35) w.HopT = 0; // molada zıp zıp
                     if (w.Timer <= 0) { PickTarget(w); w.State = WanderState.Walk; w.Pose = ZooPose.Stand; }
                     break;
 
@@ -173,14 +182,14 @@ public sealed class ZooWorld
                     {
                         w.X = w.TargetX; w.Y = w.TargetY;
                         w.State = WanderState.Idle; w.Arriving = false;
-                        if (w.Welcoming && Visitor != null)
+                        if (w.Welcoming && Celebrating > 0)
                         {
                             // Gezgine döner, sevinçle zıplar; gezgin de karşılık verir.
                             w.Welcoming = false;
                             w.State = WanderState.Greet; w.Timer = Rand(3.5, 5); w.Pose = ZooPose.Stand;
                             w.HappyTimer = w.Timer; w.HopT = 0; w.GreetCooldown = Rand(10, 16);
-                            w.FacingRight = w.X < Visitor.X;
-                            Visitor.HopT = 0; Visitor.HappyTimer = 1.5;
+                            w.FacingRight = w.X < Keeper.X;
+                            Keeper.HopT = 0; Keeper.HappyTimer = 1.5;
                         }
                         else Rest(w);
                     }
@@ -198,10 +207,18 @@ public sealed class ZooWorld
     void Rest(Wanderer w)
     {
         double r = rng.NextDouble();
-        var (pose, min, max) = r < 0.40 ? (ZooPose.Stand, 2.0, 6.0)
-                             : r < 0.62 ? (ZooPose.Sit, 6.0, 12.0)
-                             : r < 0.82 ? (ZooPose.Eat, 4.0, 8.0)
-                             : (ZooPose.Sleep, 14.0, 28.0);
+        var (pose, min, max) = Mood == ZooMood.Play
+                ? (r < 0.75 ? (ZooPose.Stand, 0.6, 2.0) : (ZooPose.Happy, 1.0, 2.0))          // molada: kıpır kıpır
+            : Mood == ZooMood.Calm || Night
+                ? (r < (Night ? 0.55 : 0.30) ? (ZooPose.Sleep, 20.0, 40.0)                     // çalışırken / gece: sakin
+                  : r < 0.70 ? (ZooPose.Sit, 10.0, 22.0)
+                  : r < 0.88 ? (ZooPose.Eat, 6.0, 12.0)
+                  : (ZooPose.Stand, 3.0, 8.0))
+            : r < 0.40 ? (ZooPose.Stand, 2.0, 6.0)
+            : r < 0.62 ? (ZooPose.Sit, 6.0, 12.0)
+            : r < 0.82 ? (ZooPose.Eat, 4.0, 8.0)
+            : (ZooPose.Sleep, 14.0, 28.0);
+        if (pose == ZooPose.Happy) { w.HappyTimer = max; w.HopT = 0; pose = ZooPose.Stand; }
         if (!w.Has[(int)pose]) (pose, min, max) = (ZooPose.Stand, 2.0, 6.0);
         w.Pose = pose;
         w.Timer = Rand(min, max);
@@ -230,11 +247,11 @@ public sealed class ZooWorld
 
     void PickTarget(Wanderer w)
     {
-        if (Visitor != null && Visit == VisitPhase.Stay)
+        if (Celebrating > 0)
         {
-            // Ziyaret sürerken gezginin yakınında dolaşırlar.
-            w.TargetX = Math.Clamp(Visitor.X + Rand(-150, 150), MinX, MaxX);
-            w.TargetY = Math.Clamp(Visitor.Y + Rand(-30, 30), MinY, MaxY);
+            // Kutlama sürerken gezginin yakınında dolaşırlar.
+            w.TargetX = Math.Clamp(Keeper.X + Rand(-150, 150), MinX, MaxX);
+            w.TargetY = Math.Clamp(Keeper.Y + Rand(-30, 30), MinY, MaxY);
             return;
         }
         if (w.Follow is { } parent && !double.IsNaN(parent.X) && rng.NextDouble() < 0.8)
@@ -255,7 +272,7 @@ public sealed class ZooWorld
             w.TargetY = Math.Clamp(o.Y + Rand(-6, 6), MinY, MaxY);
             return;
         }
-        double ang = Rand(0, Math.PI * 2), d = Rand(70, 240);
+        double ang = Rand(0, Math.PI * 2), d = Mood == ZooMood.Calm ? Rand(30, 100) : Mood == ZooMood.Play ? Rand(90, 280) : Rand(70, 240);
         w.TargetX = Math.Clamp(w.X + Math.Cos(ang) * d, MinX, MaxX);
         w.TargetY = Math.Clamp(w.Y + Math.Sin(ang) * d * 0.6, MinY, MaxY);
     }
@@ -288,7 +305,7 @@ public sealed class ZooWorld
                 w.State = WanderState.Greet; w.Timer = 2.4;
                 w.Pose = ZooPose.Stand; w.HappyTimer = 2.4;
                 w.HopT = 0;
-                w.GreetCooldown = Rand(18, 30);
+                w.GreetCooldown = Mood == ZooMood.Play ? Rand(5, 10) : Rand(18, 30);
             }
             a.FacingRight = a.X < b.X; b.FacingRight = b.X < a.X;
         }

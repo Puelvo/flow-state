@@ -126,44 +126,37 @@ public partial class MainWindow
         marketHost.Children.Add(zooMarketBtn);
         marketHost.Children.Add(zooMarketBadge);
 
-        ZooRoot.Children.Add(Header($"{map.Name} Bahçesi", "Odaklandıkça jeton biriktir, bahçene yeni dostlar kat.", balance, marketHost));
+        ZooRoot.Children.Add(Header("Dostlar", "Bahçen Çalış sekmesinde; odaklandıkça jeton biriktir, yeni dostlar kat.", balance, marketHost));
 
-        // Sahne: beyaz çerçeveli, yuvarlak köşeli büyük kart. İçinde gökyüzü, tepeler, çimen ve dolaşan hayvanlar.
+        // Bahçedekiler: sevinç pozunda, pastel kürsülerde. Tıklayınca bahçeye (Çalış) gider.
         var owned = ZooCatalog.InMap(ActiveMapId).Where(a => ZooDemo || Zoo.Owns(data, a.Id)).ToList();
-        var canvas = new Canvas { Margin = new Thickness(0, GroundTop, 0, 0) };
-        ZooRoot.Children.Add(Scene(canvas, owned.Count == 0 ? EmptyGarden() : null));
-        canvas.SizeChanged += (_, e) => { zooWorld.Width = e.NewSize.Width; zooWorld.Height = e.NewSize.Height; };
-        zooCanvas = canvas;
-
-        // Dünyayı sahip olunanlar + nadir dostlarla eşitle; konumlar ekran yeniden kurulsa da korunur.
-        string? arriving = zooArriving;
-        zooArriving = null;
-        var specials = ZooDemo ? new List<Special>() : Specials().Where(x => owned.Any(a => a.Id == x.AnimalId)).ToList();
-        var keys = owned.Select(a => a.Id).Concat(specials.Select(x => x.Key)).ToHashSet();
-        zooWorld.Animals.RemoveAll(w => !keys.Contains(w.Id));
-        foreach (var a in owned)
+        var ownedBody = new StackPanel();
+        var goGarden = new Button { Content = IconLabel(IconRes("IconTimer"), "Bahçeye git", 13, 14), Style = (Style)FindResource("Btn"), Padding = new Thickness(12, 6, 12, 6) };
+        goGarden.Click += (_, _) => NavTimer.IsChecked = true;
+        DockPanel.SetDock(goGarden, Dock.Right);
+        var ownedHead = new DockPanel();
+        ownedHead.Children.Add(goGarden);
+        ownedHead.Children.Add(new TextBlock { Text = $"{map.Name} bahçende", FontSize = 16, FontWeight = FontWeights.ExtraBold, Foreground = Res("Text"), VerticalAlignment = VerticalAlignment.Center });
+        ownedBody.Children.Add(ownedHead);
+        if (owned.Count == 0)
+            ownedBody.Children.Add(new TextBlock { Text = "Henüz kimse yok. Marketten ilk dostunu al, bahçende dolaşmaya başlasın.", Style = (Style)FindResource("PageSub"), FontSize = 13 });
+        else
         {
-            var w = zooWorld.Animals.FirstOrDefault(x => x.Id == a.Id) ?? zooWorld.Add(a.Id, arriving: a.Id == arriving);
-            AddNode(canvas, a, w, null);
+            var row = new WrapPanel { Margin = new Thickness(-6, 12, 0, 0) };
+            foreach (var a in owned)
+            {
+                var stand = new Grid { Width = 74, Height = 74 };
+                stand.Children.Add(new Ellipse { Width = 66, Height = 66, Fill = Res("AccentSoft") });
+                stand.Children.Add(SpriteImage(a.Id, 60, silhouette: false, ZooPose.Happy));
+                var tile = new StackPanel { Margin = new Thickness(6, 0, 6, 4), Width = 80 };
+                tile.Children.Add(stand);
+                tile.Children.Add(new TextBlock { Text = a.Name, FontSize = 12, FontWeight = FontWeights.ExtraBold, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res("Text"), Margin = new Thickness(0, 4, 0, 0) });
+                row.Children.Add(tile);
+            }
+            ownedBody.Children.Add(row);
         }
-        foreach (var sp in specials)
-        {
-            var a = ZooCatalog.Find(sp.AnimalId)!;
-            var w = zooWorld.Animals.FirstOrDefault(x => x.Id == sp.Key) ?? zooWorld.Add(sp.Key, arriving: sp.Key == arriving);
-            if (sp.Kind == SpecialKind.Baby) w.Follow = zooWorld.Animals.FirstOrDefault(x => x.Id == sp.AnimalId);
-            AddNode(canvas, a, w, sp.Kind);
-        }
-        EnsureZooTimer();
-
-        if (owned.Count > 0)
-        {
-            var tip = IconLabel(IconRes("IconPaw"), "Bir hayvana tıkla, sana zıplasın.", 13, 14, filled: true);
-            tip.HorizontalAlignment = HorizontalAlignment.Center;
-            tip.Margin = new Thickness(0, 14, 0, 0);
-            TextElement_SetForeground(tip, Res("Muted"));
-            ZooRoot.Children.Add(tip);
-            ZooRoot.Children.Add(CollectionCard());
-        }
+        ZooRoot.Children.Add(new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0, 20, 0, 0), Child = ownedBody });
+        if (owned.Count > 0) ZooRoot.Children.Add(CollectionCard());
 
         // Henüz alınmamışlar: sahnenin altında, pastel kürsülerde siluet olarak (merak uyandırsın).
         var missing = ZooCatalog.InMap(ActiveMapId).Where(a => !Zoo.Owns(data, a.Id)).ToList();
@@ -393,7 +386,7 @@ public partial class MainWindow
             FontSize = 17, Padding = new Thickness(30, 13, 30, 13),
             Margin = new Thickness(0, 26, 0, 0), HorizontalAlignment = HorizontalAlignment.Center
         };
-        go.Click += (_, _) => { zooArriving = a.Id; zooBoughtId = null; GoZoo(ZooScreen.Garden); };
+        go.Click += (_, _) => { zooArriving = a.Id; zooBoughtId = null; GoZoo(ZooScreen.Garden); NavTimer.IsChecked = true; };
         panel.Children.Add(go);
 
         // Sıcak, şeftali-krem geçişli büyük kart
@@ -506,11 +499,11 @@ public partial class MainWindow
     void TickZoo()
     {
         // Bahçe görünmüyorken dünya durur (hayvanlar kaldıkları yerden devam eder).
-        if (zooCanvas == null || zooScreen != ZooScreen.Garden || !ZooView.IsVisible) { zooClock.Reset(); return; }
+        if (zooCanvas == null || !TimerView.IsVisible || widgetMode) { zooClock.Reset(); return; }
         double dt = zooClock.IsRunning ? zooClock.Elapsed.TotalSeconds : 0;
         zooClock.Restart();
         zooWorld.Update(dt);
-        TickVisitor();
+        TickKeeper();
 
         const double S = ZooWorld.Sprite;
         foreach (var n in zooNodes)

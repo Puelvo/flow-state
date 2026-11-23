@@ -72,27 +72,37 @@ public partial class MainWindow
         await Task.Delay(1500);
 
         if (CourseList.Items.Count > 1) CourseList.SelectedIndex = 1;
-        await Shot("01-calis", 900);
 
-        // Çalışırken: 2 sa 25 dk'lık süren bir oturum (yıldızlar ve çember dolu görünsün).
+        // Güneş saat: dört vakit (sabit tema) ve otomatik.
+        foreach (var (theme, name) in new[] { ("day", "01-calis-gunduz"), ("dawn", "01b-calis-safak"), ("sunset", "01c-calis-gunbatimi"), ("night", "01d-calis-gece") })
+        {
+            data.GardenTheme = theme;
+            ApplySunPalette(force: true);
+            await Shot(name, 2200);
+        }
+        data.GardenTheme = "day";
+        ApplySunPalette(force: true);
+
+        // Çalışırken: 2 sa 25 dk'lık süren bir oturum (yıldızlar ve halka dolu, gezgin yürüyor, hayvanlar sakin).
         ApplyLiveLocal(new LiveState
         {
             Active = true, RunId = "shot", CourseId = SelectedCourse?.Id ?? Course.GeneralId,
             Start = DateTime.Now.AddMinutes(-150), Accumulated = 2 * 3600 + 25 * 60, RunningSince = DateTime.UtcNow
         });
         UpdateAll();
-        await Shot("02-calis-calisirken", 1600);
+        await Shot("02-calis-calisirken", 3000);
+        data.GardenTheme = "night";
+        ApplySunPalette(force: true);
+        await Shot("02b-calis-calisirken-gece", 1500);
+        data.GardenTheme = "day";
+        ApplySunPalette(force: true);
 
         NavStats.IsChecked = true;
         await Shot("03-istatistik", 1200, StatsView);
         NavHistory.IsChecked = true;
         await Shot("04-gecmis", 1000, HistoryPanel);
         NavZoo.IsChecked = true;
-        await Shot("05-bahce", 3500, ZooView);
-        // Gezgin ziyareti: girerken ve hayvanlar onu karşılarken.
-        explorerVisitPending = true;
-        await Shot("05b-gezgin-geliyor", 3500);
-        await Shot("05c-gezgin-karsilama", 7000);
+        await Shot("05-dostlar", 1500, ZooView);
         GoZoo(ZooScreen.Shop);
         await Shot("06-market", 1500, ZooView);
         zooBoughtId = "rhino";
@@ -118,6 +128,7 @@ public partial class MainWindow
 
         // Jeton ödülü: 1,5 saatlik bir oturumun bitişi (kart açılmış, jetonlar havada / sekmeye varmış).
         Commit();
+        explorerVisitPending = true;
         UpdateAll();
         await Task.Delay(800);
         // Örnek veride nadir dost getirmiş bir seans varsa ödül kartında "Sürpriz!" de görünsün.
@@ -127,7 +138,9 @@ public partial class MainWindow
         ShowCoinReward(rs, false, sp);
         await Shot("12-jeton", 650);
         await Shot("13-jeton-ucus", 900);
-        await Task.Delay(3000);
+        // Oturum bitince hayvanlar gezginin etrafına toplanır.
+        await Shot("13b-kutlama-bahcede", 4500);
+        await Task.Delay(1500);
 
         // Geri sayım: boşta (süre seçici) ve çalışırken (45 dk hedefin 17 dk'sı geçmiş).
         ModeCountdown.IsChecked = true;

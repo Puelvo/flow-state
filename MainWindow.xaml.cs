@@ -39,6 +39,7 @@ public partial class MainWindow : Window
         if (ShotMode) { Store.ReadOnly = true; SeedSample(); } // ekran görüntüsü modu: örnek veri, diske yazma yok
         InitializeComponent();
         RingHost.LayoutTransform = NormalRingScale;
+        BuildSunScene();
         data.CountdownMinutes = Math.Clamp(data.CountdownMinutes, DialMin, DialMax);
         if (data.Countdown) ModeCountdown.IsChecked = true;
 
@@ -466,7 +467,7 @@ public partial class MainWindow : Window
         ringShown = m;
 
         // Yuvarlak uçlar: başlangıç ve güncel uç kendi geçiş renklerini alır.
-        var acc = WidgetColor();
+        var acc = RingColor();
         ringCapStart!.Fill = new SolidColorBrush(GradAt(acc, 0));
         ringCapEnd!.Fill = new SolidColorBrush(GradAt(acc, frac));
         var (ex, ey) = RingPoint(deg);
@@ -500,7 +501,7 @@ public partial class MainWindow : Window
     // Tema rengi değişince çizgilerin renkleri yeniden verilir.
     void EnsureRingSegments()
     {
-        var acc = WidgetColor();
+        var acc = RingColor();
         if (ringCapStart != null && ringBuiltFor == acc) return;
         ringBuiltFor = acc;
         if (ringCapStart == null)
@@ -675,7 +676,7 @@ public partial class MainWindow : Window
         SocialView.Visibility = NavSocial.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         SocialShown(SocialView.Visibility == Visibility.Visible);
         SettingsView.Visibility = NavSettings.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        if (SettingsView.Visibility == Visibility.Visible) BuildSettings();
+        if (SettingsView.Visibility == Visibility.Visible) { BuildSettings(); BuildGardenThemeTiles(); }
         UpdateAll();
     }
 
@@ -692,6 +693,7 @@ public partial class MainWindow : Window
         if (StatsView.Visibility == Visibility.Visible) UpdateStats();
         if (HistoryView.Visibility == Visibility.Visible) UpdateHistory();
         if (ZooView.Visibility == Visibility.Visible) UpdateZoo();
+        if (TimerView.Visibility == Visibility.Visible) UpdateSunScene();
     }
 
     void UpdateTimerView()
@@ -717,7 +719,7 @@ public partial class MainWindow : Window
 
         // Çember ve başlat butonu ayarlardaki tema rengini alır (StartBtn: DynamicResource Accent).
         // Widget'ta parıltı yok: sakin, sabit görünüm. Açık zeminde hafif, renkli bir hale yeter.
-        var tc = WidgetColor();
+        var tc = RingColor();
         if (widgetMode) RingArc.Effect = null;
         else if (RingArc.Effect is not System.Windows.Media.Effects.DropShadowEffect glow || glow.Color != tc)
             RingArc.Effect = new System.Windows.Media.Effects.DropShadowEffect
@@ -741,6 +743,7 @@ public partial class MainWindow : Window
             HourPips.Visibility = HourPips.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             PipsLabel.Visibility = PipsLabel.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
+        PipsBar.Visibility = !widgetMode && (HourPips.Children.Count > 0 || PipsLabel.Text.Length > 0) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void UpdateStats()
@@ -1234,6 +1237,10 @@ public partial class MainWindow : Window
             TopBar.Visibility = Visibility.Collapsed;
             TimerHello.Visibility = Visibility.Collapsed;
             CourseTools.Visibility = Visibility.Collapsed;
+            ToolsBar.Visibility = Visibility.Collapsed;
+            SunScene.Visibility = Visibility.Collapsed;
+            PipsBar.Visibility = Visibility.Collapsed;
+            TimerPanel.VerticalAlignment = VerticalAlignment.Center;
             AddPanel.Visibility = Visibility.Collapsed;
             WidgetFrame.Visibility = Visibility.Visible;
             WidgetBar.Visibility = Visibility.Visible;
@@ -1248,10 +1255,10 @@ public partial class MainWindow : Window
             BtnRow.Margin = new Thickness(0, 6, 0, 0);
             StartBtn.Width = StartBtn.Height = 60;
             FinishBtn.Width = FinishBtn.Height = 50;
-            TimerCourseName.FontSize = 28;
-            TimerStatus.FontSize = 18;
-            ElapsedText.FontSize = 25;
-            ElapsedText.Margin = new Thickness(0, 2, 0, 0);
+            TimerCourseName.FontSize = 26;
+            TimerStatus.FontSize = 17;
+            ElapsedText.FontSize = 46;
+            ElapsedText.Margin = new Thickness(0, 0, 0, 2);
             TimerPanel.LayoutTransform = new ScaleTransform(WidgetScale, WidgetScale);
 
             MinWidth = 0; MinHeight = 0;
@@ -1283,6 +1290,9 @@ public partial class MainWindow : Window
             TopBar.Visibility = Visibility.Visible;
             TimerHello.Visibility = Visibility.Visible;
             CourseTools.Visibility = Visibility.Visible;
+            ToolsBar.Visibility = Visibility.Visible;
+            SunScene.Visibility = Visibility.Visible;
+            TimerPanel.VerticalAlignment = VerticalAlignment.Stretch;
             WidgetFrame.Visibility = Visibility.Collapsed;
             WidgetBar.Visibility = Visibility.Collapsed;
             BgLayer.Visibility = Visibility.Visible;
@@ -1290,16 +1300,16 @@ public partial class MainWindow : Window
             CourseList.Visibility = Visibility.Visible;
             HourPips.Visibility = Visibility.Visible;
             PipsLabel.Visibility = Visibility.Visible;
-            TimerPanel.Margin = new Thickness(24, 12, 24, 28);
-            RingHost.Margin = new Thickness(0, 10, 0, 0);
+            TimerPanel.Margin = new Thickness(24, 4, 24, 18);
+            RingHost.Margin = new Thickness(0, 6, 0, 0);
             RingHost.LayoutTransform = NormalRingScale;
             BtnRow.Margin = new Thickness(0, 14, 0, 0);
             StartBtn.Width = StartBtn.Height = 92;
             FinishBtn.Width = FinishBtn.Height = 72;
-            TimerCourseName.FontSize = 22;
+            TimerCourseName.FontSize = 20;
             TimerStatus.FontSize = 13;
-            ElapsedText.FontSize = 42;
-            ElapsedText.Margin = new Thickness(0, 6, 0, 0);
+            ElapsedText.FontSize = 40;
+            ElapsedText.Margin = new Thickness(0, 0, 0, 2);
             TimerPanel.LayoutTransform = Transform.Identity;
 
             Left = normalBounds.X; Top = normalBounds.Y;
@@ -1371,11 +1381,10 @@ public partial class MainWindow : Window
         Blob(Blob4A, Blob4B, Mix(Color.FromRgb(0xB8, 0xF0, 0xD6), c, 0.25), 0x60);
     }
 
-    // Widget'ta hareketli arka plan kapalı; yerine tema rengine hafifçe çalan krem zemin.
+    // Widget: bahçe sahnesi kapalı; zemin vaktin gökyüzü (güneş saat gökyüzünde asılı durur).
     void ApplyWidgetBackground()
     {
-        var c = WidgetColor();
-        Background = new LinearGradientBrush(Mix(Cream, c, 0.05), Mix(Peach, c, 0.12), new Point(0, 0), new Point(1, 1));
+        Background = new LinearGradientBrush(C(sunPalette.SkyTop), C(sunPalette.SkyBottom), 90);
     }
 
     // ---------- yuvarlak düğme ikonları ----------

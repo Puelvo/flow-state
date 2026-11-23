@@ -136,9 +136,9 @@ public partial class MainWindow
         return new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0, 18, 0, 0), Child = body };
     }
 
-    // ---------- gezgin ziyareti ----------
+    // ---------- gezgin (bahçede hep var) ----------
 
-    bool explorerVisitPending;            // oturum bitti: gezgin bir dahaki bahçe açılışında gelir
+    bool explorerVisitPending;            // oturum bitti: bahçe göründüğünde hayvanlar gezgini kutlar
     Canvas? visitorRoot, visitorCanvas;
     Image? visitorImg;
     TranslateTransform? visitorHop;
@@ -146,34 +146,30 @@ public partial class MainWindow
     FrameworkElement? visitorBubble;
     const double VisitorSize = 92;
 
-    /// <summary>Bahçe tikinde: bekleyen ziyareti başlatır ve gezgini çizer.</summary>
-    void TickVisitor()
+    /// <summary>Bahçe tikinde: bekleyen kutlamayı başlatır ve gezgini çizer.</summary>
+    void TickKeeper()
     {
-        if (zooCanvas == null) return;
-        if (explorerVisitPending && zooWorld.Width > 0 && zooWorld.Animals.Count > 0 && zooWorld.Visitor == null)
+        if (zooCanvas == null || zooWorld.Width <= 0) return;
+        if (explorerVisitPending && zooWorld.Animals.Count > 0)
         {
             explorerVisitPending = false;
-            zooWorld.StartVisit();
-        }
-        var v = zooWorld.Visitor;
-        if (v == null)
-        {
-            if (visitorRoot != null) { (visitorRoot.Parent as Panel)?.Children.Remove(visitorRoot); visitorRoot = null; }
-            return;
+            zooWorld.Celebrate();
         }
         if (visitorRoot == null || visitorCanvas != zooCanvas) BuildVisitorNode();
+        var v = zooWorld.Keeper;
+        if (double.IsNaN(v.X)) { visitorRoot!.Visibility = Visibility.Hidden; return; }
+        visitorRoot!.Visibility = Visibility.Visible;
 
         var frames = ExplorerFrames();
         var frame = v.State == WanderState.Walk && frames.Length > 1 ? frames[1 + (int)(v.WalkTime * 8) % (frames.Length - 1)] : frames[0];
         if (!ReferenceEquals(visitorImg!.Source, frame)) visitorImg.Source = frame;
         visitorFlip!.ScaleX = v.FacingRight ? 1 : -1;
         visitorHop!.Y = Math.Round(v.HopOffset * 0.7);
-        Canvas.SetLeft(visitorRoot!, Math.Round(v.X - VisitorSize / 2));
-        Canvas.SetTop(visitorRoot!, Math.Round(v.Y - VisitorSize + 2));
-        Panel.SetZIndex(visitorRoot!, (int)v.Y);
-        visitorBubble!.Visibility = zooWorld.Visit == VisitPhase.Stay && v.Timer > ZooWorld.StaySeconds - 4 ? Visibility.Visible : Visibility.Collapsed;
+        Canvas.SetLeft(visitorRoot, Math.Round(v.X - VisitorSize / 2));
+        Canvas.SetTop(visitorRoot, Math.Round(v.Y - VisitorSize + 2));
+        Panel.SetZIndex(visitorRoot, (int)v.Y);
+        visitorBubble!.Visibility = zooWorld.Celebrating > ZooWorld.CelebrateSeconds - 4 ? Visibility.Visible : Visibility.Collapsed;
     }
-
     void BuildVisitorNode()
     {
         if (visitorRoot != null) (visitorRoot.Parent as Panel)?.Children.Remove(visitorRoot);

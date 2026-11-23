@@ -5,7 +5,7 @@ name: Ekran görüntüleri
 on:
   workflow_dispatch:
   push:
-    branches: [claude/tasarim-yenileme]
+    branches: [claude/tasarim-yenileme, claude/gunes-saat]
     paths: ['**.xaml', '**.cs', 'Assets/**', 'FlowState.csproj', '.github/workflows/screenshots.yml']
 
 permissions:
