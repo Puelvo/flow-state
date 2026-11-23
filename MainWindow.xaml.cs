@@ -36,6 +36,7 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        if (ShotMode) { Store.ReadOnly = true; SeedSample(); } // ekran görüntüsü modu: örnek veri, diske yazma yok
         InitializeComponent();
 
         // Önceki çalışma çökme/kapanma ile yarım kaldıysa kaydet.
@@ -78,6 +79,7 @@ public partial class MainWindow : Window
         RefreshSyncUi();
         InitSocialBadge();
         if (data.Live.Active && data.Courses.Any(c => c.Id == data.Live.CourseId)) { ApplyLiveLocal(data.Live); UpdateAll(); }
+        if (ShotMode) Loaded += async (_, _) => await TakeShots();
     }
 
     // ---------- senkronizasyon ----------
