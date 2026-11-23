@@ -222,63 +222,145 @@
         <!-- İstatistik görünümü -->
         <ScrollViewer x:Name="StatsView" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="40,20,40,36" MaxWidth="860">
-                <TextBlock Text="İstatistikler" FontSize="28" FontWeight="Bold"/>
+                <StackPanel.Resources>
+                    <!-- Grafik boş durum yazısı (çubukların üstünde ortalı) -->
+                    <Style x:Key="ChartEmptyText" TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+                        <Setter Property="FontWeight" Value="Bold"/>
+                        <Setter Property="FontSize" Value="13"/>
+                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="TextAlignment" Value="Center"/>
+                        <Setter Property="TextWrapping" Value="Wrap"/>
+                        <Setter Property="Margin" Value="0,0,0,40"/>
+                        <Setter Property="IsHitTestVisible" Value="False"/>
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                    </Style>
+                    <!-- Bölüm başlığının yanındaki sönük açıklama -->
+                    <Style x:Key="HNote" TargetType="Run">
+                        <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+                        <Setter Property="FontSize" Value="13"/>
+                        <Setter Property="FontWeight" Value="Bold"/>
+                    </Style>
+                    <!-- Isı haritası gün etiketi -->
+                    <Style x:Key="HeatDay" TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+                        <Setter Property="FontSize" Value="11"/>
+                        <Setter Property="FontWeight" Value="Bold"/>
+                        <Setter Property="Height" Value="32"/>
+                        <Setter Property="Padding" Value="0,8,0,0"/>
+                    </Style>
+                </StackPanel.Resources>
 
-                <TextBlock Text="TÜM DERSLER" Style="{StaticResource H}"/>
-                <UniformGrid x:Name="StatsCards" Columns="4" Margin="0,0,-10,0"/>
+                <TextBlock Text="İstatistikler" Style="{StaticResource PageTitle}"/>
+                <TextBlock Text="Emeğinin izini sür: çalıştığın her dakika burada birikiyor." Style="{StaticResource PageSub}"/>
 
-                <TextBlock Text="SERİ" Style="{StaticResource H}"/>
-                <UniformGrid x:Name="StreakCards" Columns="3" Margin="0,0,-10,0"/>
+                <TextBlock Text="Özet" Style="{StaticResource H}" Margin="4,24,0,12"/>
+                <UniformGrid x:Name="StatsCards" Columns="4" Margin="0,0,-14,0"/>
 
-                <TextBlock Text="DERS BAZINDA DAĞILIM" Style="{StaticResource H}"/>
-                <StackPanel Orientation="Horizontal" Margin="-3,0,0,14">
-                    <RadioButton GroupName="seg" Style="{StaticResource Nav}" Content="Bugün" Tag="today" IsChecked="True" Padding="14,6" FontSize="13" Checked="Seg_Checked"/>
-                    <RadioButton GroupName="seg" Style="{StaticResource Nav}" Content="Bu hafta" Tag="week" Padding="14,6" FontSize="13" Checked="Seg_Checked"/>
-                    <RadioButton GroupName="seg" Style="{StaticResource Nav}" Content="Bu ay" Tag="month" Padding="14,6" FontSize="13" Checked="Seg_Checked"/>
-                    <RadioButton GroupName="seg" Style="{StaticResource Nav}" Content="Toplam" Tag="all" Padding="14,6" FontSize="13" Checked="Seg_Checked"/>
-                </StackPanel>
-                <StackPanel x:Name="BreakdownPanel"/>
+                <TextBlock Style="{StaticResource H}">
+                    <Run Text="Seri"/><Run Text="   her gün biraz, ama her gün" Style="{StaticResource HNote}"/>
+                </TextBlock>
+                <UniformGrid x:Name="StreakCards" Columns="3" Margin="0,0,-14,0"/>
 
-                <TextBlock Text="SON 14 GÜN" Style="{StaticResource H}"/>
-                <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="16,18,16,12">
-                    <UniformGrid x:Name="ChartGrid" Columns="14" Height="210"/>
+                <DockPanel Margin="0,30,0,12">
+                    <Border DockPanel.Dock="Right" Style="{StaticResource SegBar}" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton GroupName="seg" Style="{StaticResource Seg}" Content="Bugün" Tag="today" IsChecked="True" Checked="Seg_Checked"/>
+                            <RadioButton GroupName="seg" Style="{StaticResource Seg}" Content="Bu hafta" Tag="week" Checked="Seg_Checked"/>
+                            <RadioButton GroupName="seg" Style="{StaticResource Seg}" Content="Bu ay" Tag="month" Checked="Seg_Checked"/>
+                            <RadioButton GroupName="seg" Style="{StaticResource Seg}" Content="Toplam" Tag="all" Checked="Seg_Checked"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="Ders bazında dağılım" Style="{StaticResource H}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                </DockPanel>
+                <Border Style="{StaticResource Card}" Padding="22,18,22,8">
+                    <StackPanel x:Name="BreakdownPanel"/>
                 </Border>
 
-                <TextBlock Text="SON 18 HAFTA · ISI HARİTASI" Style="{StaticResource H}"/>
-                <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="18,16,18,14">
+                <TextBlock Style="{StaticResource H}">
+                    <Run Text="Son 14 gün"/><Run Text="   bugün renkli" Style="{StaticResource HNote}"/>
+                </TextBlock>
+                <Border Style="{StaticResource Card}" Padding="16,18,16,12">
+                    <Grid>
+                        <UniformGrid x:Name="ChartGrid" Columns="14" Height="210"/>
+                        <TextBlock x:Name="ChartEmpty" Style="{StaticResource ChartEmptyText}"
+                                   Text="Son iki haftada kayıt yok. İlk çubuğu bugün sen dik!"/>
+                    </Grid>
+                </Border>
+
+                <TextBlock Style="{StaticResource H}">
+                    <Run Text="Isı haritası"/><Run Text="   son 18 hafta" Style="{StaticResource HNote}"/>
+                </TextBlock>
+                <Border Style="{StaticResource Card}" Padding="22,20,22,16">
                     <StackPanel>
-                        <UniformGrid x:Name="HeatGrid" Rows="7" Columns="18"/>
-                        <DockPanel Margin="0,10,0,0">
-                            <StackPanel x:Name="HeatLegend" DockPanel.Dock="Right" Orientation="Horizontal"/>
-                            <TextBlock Text="Her kare bir gün; koyu = hedefe yakın / hedefi aşan" Foreground="{StaticResource Muted}" FontSize="12"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <!-- Satır etiketleri: Pazartesi başlangıç -->
+                            <StackPanel Width="34">
+                                <TextBlock Text="Pzt" Style="{StaticResource HeatDay}"/>
+                                <TextBlock Text="" Style="{StaticResource HeatDay}"/>
+                                <TextBlock Text="Çar" Style="{StaticResource HeatDay}"/>
+                                <TextBlock Text="" Style="{StaticResource HeatDay}"/>
+                                <TextBlock Text="Cum" Style="{StaticResource HeatDay}"/>
+                                <TextBlock Text="" Style="{StaticResource HeatDay}"/>
+                                <TextBlock Text="Paz" Style="{StaticResource HeatDay}"/>
+                            </StackPanel>
+                            <UniformGrid x:Name="HeatGrid" Rows="7" Columns="18"/>
+                        </StackPanel>
+                        <DockPanel Margin="0,14,0,0">
+                            <StackPanel x:Name="HeatLegend" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"/>
+                            <TextBlock Text="Her kare bir gün. Renk koyulaştıkça o gün daha çok çalışmışsın."
+                                       Foreground="{StaticResource Muted}" FontSize="12" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"/>
                         </DockPanel>
                     </StackPanel>
                 </Border>
 
-                <TextBlock Text="HAFTALIK TOPLAM · SON 8 HAFTA" Style="{StaticResource H}"/>
-                <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="16,18,16,12">
-                    <UniformGrid x:Name="WeekGrid" Columns="8" Height="210"/>
+                <TextBlock Style="{StaticResource H}">
+                    <Run Text="Haftalık toplam"/><Run Text="   son 8 hafta" Style="{StaticResource HNote}"/>
+                </TextBlock>
+                <Border Style="{StaticResource Card}" Padding="16,18,16,12">
+                    <Grid>
+                        <UniformGrid x:Name="WeekGrid" Columns="8" Height="210"/>
+                        <TextBlock x:Name="WeekEmpty" Style="{StaticResource ChartEmptyText}"
+                                   Text="Haftalar henüz boş. Bir oturum başlat, burası dolmaya başlasın."/>
+                    </Grid>
                 </Border>
 
-                <TextBlock Text="GÜNÜN SAATLERİ · NE ZAMAN ÇALIŞIYORSUN" Style="{StaticResource H}"/>
-                <Border Background="{StaticResource Panel}" CornerRadius="16" Padding="16,18,16,12">
-                    <UniformGrid x:Name="HourGrid" Columns="24" Height="190"/>
+                <TextBlock Style="{StaticResource H}">
+                    <Run Text="Günün saatleri"/><Run Text="   en çok ne zaman çalışıyorsun?" Style="{StaticResource HNote}"/>
+                </TextBlock>
+                <Border Style="{StaticResource Card}" Padding="16,18,16,12">
+                    <Grid>
+                        <UniformGrid x:Name="HourGrid" Columns="24" Height="190"/>
+                        <TextBlock x:Name="HourEmpty" Style="{StaticResource ChartEmptyText}"
+                                   Text="Biraz çalışınca en verimli saatlerin burada görünecek."/>
+                    </Grid>
                 </Border>
             </StackPanel>
         </ScrollViewer>
 
         <!-- Geçmiş görünümü -->
-        <Grid x:Name="HistoryView" Grid.Row="1" Visibility="Collapsed" Margin="40,20,40,36">
+        <Grid x:Name="HistoryView" Grid.Row="1" Visibility="Collapsed" Margin="24,20,24,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <DockPanel Margin="0,0,0,18" MaxWidth="860">
-                <Button DockPanel.Dock="Right" Content="CSV olarak dışa aktar" Style="{StaticResource Btn}" Click="Export_Click"/>
-                <TextBlock Text="Geçmiş" FontSize="28" FontWeight="Bold"/>
+            <DockPanel Margin="16,0,16,8" MaxWidth="860">
+                <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Background="{StaticResource Surface}"
+                        VerticalAlignment="Center" ToolTip="Tüm kayıtları CSV dosyası olarak kaydet" Click="Export_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconDownload}" Style="{StaticResource Icon}" Width="16" Height="16"/>
+                        <TextBlock Text="CSV olarak dışa aktar" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <StackPanel>
+                    <TextBlock Text="Geçmiş" Style="{StaticResource PageTitle}"/>
+                    <TextBlock Text="Her oturum küçük bir adım. İşte bugüne kadarki yolculuğun." Style="{StaticResource PageSub}"/>
+                </StackPanel>
             </DockPanel>
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="HistoryPanel" MaxWidth="860"/>
+                <StackPanel x:Name="HistoryPanel" MaxWidth="860" Margin="16,4,16,36"/>
             </ScrollViewer>
         </Grid>
 

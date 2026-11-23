@@ -30,7 +30,7 @@ public partial class MainWindow : Window
     string period = "today";
 
     bool ready;
-    TextBlock[] statCards = null!, streakCards = null!;
+    TextBlock[] statCards = null!, streakCards = null!, streakNotes = null!;
 
     static DateTime Today => DateTime.Today;
 
@@ -48,9 +48,19 @@ public partial class MainWindow : Window
             Store.Save(data);
         }
 
-        string[] titles = { "Bugün", "Bu hafta", "Bu ay", "Toplam" };
-        statCards = BuildCards(StatsCards, titles);
-        streakCards = BuildCards(StreakCards, new[] { "Güncel seri", "En uzun seri", "Çalışılan gün" });
+        statCards = BuildCards(StatsCards, new StatCardSpec[]
+        {
+            new("Bugün", "IconTimer", "Accent", "AccentSoft"),
+            new("Bu hafta", "IconChart", "Good", "GoodSoft"),
+            new("Bu ay", "IconPaw", "Warn", "WarnSoft"),
+            new("Toplam", "IconSparkle", "Coin", "WarnSoft", Filled: true),
+        }, out _);
+        streakCards = BuildCards(StreakCards, new StatCardSpec[]
+        {
+            new("Güncel seri", "IconFlame", "Danger", "DangerSoft", Filled: true),
+            new("En uzun seri", "IconHeart", "Danger", "DangerSoft"),
+            new("Çalışılan gün", "IconHistory", "Accent", "AccentSoft"),
+        }, out streakNotes);
 
         BuildStars();
         ApplyTheme();
@@ -231,31 +241,78 @@ public partial class MainWindow : Window
         return n;
     }
 
-    TextBlock[] BuildCards(Panel host, string[] titles)
+    /// <summary>İstatistik kartı tanımı: başlık, ikon geometrisi, ikon rengi ve rozet zemini (kaynak adları).</summary>
+    record StatCardSpec(string Title, string Icon, string Fg, string Bg, bool Filled = false);
+
+    // Beyaz kart: solda renkli yuvarlak ikon rozeti ve başlık, altında büyük kalın değer ve küçük bir not satırı.
+    TextBlock[] BuildCards(Panel host, StatCardSpec[] specs, out TextBlock[] notes)
     {
-        var values = new TextBlock[titles.Length];
-        for (int i = 0; i < titles.Length; i++)
+        var values = new TextBlock[specs.Length];
+        notes = new TextBlock[specs.Length];
+        for (int i = 0; i < specs.Length; i++)
         {
-            var val = new TextBlock { FontSize = 22, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 6, 0, 0), Text = "-" };
+            var sp = specs[i];
+            var icon = new System.Windows.Shapes.Path
+            {
+                Data = (Geometry)FindResource(sp.Icon), Style = (Style)FindResource("Icon"),
+                Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Center
+            };
+            icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, sp.Fg);
+            if (sp.Filled) icon.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, sp.Fg);
+            var badge = new Border { Width = 38, Height = 38, CornerRadius = new CornerRadius(19), Child = icon };
+            badge.SetResourceReference(Border.BackgroundProperty, sp.Bg);
+
+            var head = new StackPanel { Orientation = Orientation.Horizontal };
+            head.Children.Add(badge);
+            head.Children.Add(new TextBlock
+            {
+                Text = sp.Title, Foreground = Res("Muted"), FontSize = 13, FontWeight = FontWeights.ExtraBold,
+                VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0)
+            });
+
+            var val = new TextBlock
+            {
+                Text = "-", Foreground = Res("Text"), FontSize = 26, FontWeight = FontWeights.Black,
+                Margin = new Thickness(2, 12, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis
+            };
+            var note = new TextBlock
+            {
+                Foreground = Res("Muted"), FontSize = 12, FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(2, 2, 0, 0), TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed
+            };
+
             var card = new Border
             {
-                Background = Res("Panel"),
-                CornerRadius = new CornerRadius(16),
-                Padding = new Thickness(18, 16, 18, 16),
-                Margin = new Thickness(0, 0, 10, 0),
-                Child = new StackPanel
-                {
-                    Children =
-                    {
-                        new TextBlock { Text = titles[i], Foreground = Res("Muted"), FontSize = 13 },
-                        val
-                    }
-                }
+                Style = (Style)FindResource("Card"),
+                Padding = new Thickness(18, 16, 16, 16),
+                Margin = new Thickness(0, 0, 14, 0),
+                Child = new StackPanel { Children = { head, val, note } }
             };
             host.Children.Add(card);
             values[i] = val;
+            notes[i] = note;
         }
         return values;
+    }
+
+    // "2 sa 05 dk" gibi bir metni büyük sayı + küçük birim olarak yazar.
+    void SetBigValue(TextBlock tb, string text)
+    {
+        tb.Inlines.Clear();
+        var parts = text.Split(' ');
+        for (int i = 0; i < parts.Length; i++)
+        {
+            var p = parts[i];
+            bool num = p.Length > 0 && char.IsDigit(p[0]);
+            var run = new System.Windows.Documents.Run(num ? p : (i > 0 ? " " : "") + p + (i < parts.Length - 1 ? " " : ""));
+            if (!num)
+            {
+                run.FontSize = 14;
+                run.FontWeight = FontWeights.ExtraBold;
+                run.Foreground = Res("Muted");
+            }
+            tb.Inlines.Add(run);
+        }
     }
 
     void Save() { Store.Save(data); sync?.MarkDirty(); }
@@ -625,16 +682,26 @@ public partial class MainWindow : Window
     void UpdateStats()
     {
         var per = PerDay();
-        double today = per.GetValueOrDefault(Today);
         int streak = Streak(per);
-        streakCards[0].Text = $"🔥 {streak} gün";
-        streakCards[1].Text = $"{Math.Max(streak, StatsMath.LongestStreak(per))} gün";
-        streakCards[2].Text = $"{StatsMath.ActiveDays(per)} gün";
+        int longest = Math.Max(streak, StatsMath.LongestStreak(per));
+        int activeDays = StatsMath.ActiveDays(per);
+        SetBigValue(streakCards[0], $"{streak} gün");
+        SetBigValue(streakCards[1], $"{longest} gün");
+        SetBigValue(streakCards[2], $"{activeDays} gün");
 
-        statCards[0].Text = Fmt(SecondsSince(Today, null));
-        statCards[1].Text = Fmt(SecondsSince(WeekStart(), null));
-        statCards[2].Text = Fmt(SecondsSince(PeriodFrom("month"), null));
-        statCards[3].Text = Fmt(SecondsSince(DateTime.MinValue, null));
+        bool todayDone = per.GetValueOrDefault(Today) >= StatsMath.MinDaySeconds;
+        SetNote(streakNotes[0], streak == 0 ? "Bugün yeni bir seri başlat!"
+            : todayDone ? "Bugünü de kaptın, harika gidiyorsun!"
+            : "Seriyi sürdürmek için bugün biraz çalış.");
+        SetNote(streakNotes[1], longest == 0 ? "İlk rekorun seni bekliyor."
+            : streak > 0 && streak == longest ? "Şu an rekordasın!"
+            : $"Rekora {longest - streak} gün kaldı.");
+        SetNote(streakNotes[2], "En az 1 dakika çalıştığın günler.");
+
+        SetBigValue(statCards[0], Fmt(SecondsSince(Today, null)));
+        SetBigValue(statCards[1], Fmt(SecondsSince(WeekStart(), null)));
+        SetBigValue(statCards[2], Fmt(SecondsSince(PeriodFrom("month"), null)));
+        SetBigValue(statCards[3], Fmt(SecondsSince(DateTime.MinValue, null)));
         UpdateBreakdown();
         UpdateChart();
         UpdateHeatmap(per);
@@ -642,12 +709,67 @@ public partial class MainWindow : Window
         UpdateHourly();
     }
 
-    // Isı haritası: sütun = hafta (Pzt..Paz satırları), son 18 hafta.
+    static void SetNote(TextBlock tb, string text)
+    {
+        tb.Text = text;
+        tb.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    // Ders rengi (bozuk ya da eksikse sönük kakao).
+    static Color CourseColor(string? hex)
+    {
+        try { if (!string.IsNullOrWhiteSpace(hex)) return (Color)ColorConverter.ConvertFromString(hex)!; }
+        catch (FormatException) { }
+        return Color.FromRgb(0xCB, 0xB9, 0xAC);
+    }
+
+    // Sevimli boş durum: yuvarlak pastel rozet içinde ikon, kısa başlık ve sıcak bir cümle.
+    UIElement EmptyState(string iconKey, string title, string sub)
+    {
+        var icon = new System.Windows.Shapes.Path
+        {
+            Data = (Geometry)FindResource(iconKey), Style = (Style)FindResource("Icon"),
+            Width = 28, Height = 28, HorizontalAlignment = HorizontalAlignment.Center
+        };
+        icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "Accent");
+        var badge = new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(32), Child = icon, HorizontalAlignment = HorizontalAlignment.Center };
+        badge.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+        return new StackPanel
+        {
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 18),
+            Children =
+            {
+                badge,
+                new TextBlock
+                {
+                    Text = title, Foreground = Res("Text"), FontSize = 16, FontWeight = FontWeights.ExtraBold,
+                    HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 12, 0, 0)
+                },
+                new TextBlock
+                {
+                    Text = sub, Foreground = Res("Muted"), FontSize = 13, FontWeight = FontWeights.SemiBold,
+                    HorizontalAlignment = HorizontalAlignment.Center, TextAlignment = TextAlignment.Center,
+                    TextWrapping = TextWrapping.Wrap, MaxWidth = 380, Margin = new Thickness(0, 4, 0, 0)
+                }
+            }
+        };
+    }
+
+    // Küçük hap etiket (saat aralığı, süre, yüzde).
+    static Border Pill(string text, Brush? bg, Brush? fg, bool bold = false) => new()
+    {
+        Background = bg, CornerRadius = new CornerRadius(11), Padding = new Thickness(10, 3, 10, 4),
+        VerticalAlignment = VerticalAlignment.Center,
+        Child = new TextBlock { Text = text, Foreground = fg, FontSize = 12, FontWeight = bold ? FontWeights.ExtraBold : FontWeights.Bold }
+    };
+
+    // Isı haritası: sütun = hafta (Pzt..Paz satırları), son 18 hafta. Boş günler Panel2, dolu günler tema renginin tonları.
     void UpdateHeatmap(Dictionary<DateTime, int> per)
     {
         const int weeks = 18;
         HeatGrid.Children.Clear();
         var acc = WidgetColor();
+        var empty = Res("Panel2");
         const double goalSec = 2 * 3600; // yoğunluk referansı
         var start = StatsMath.Monday(Today).AddDays(-7 * (weeks - 1));
         for (int row = 0; row < 7; row++)
@@ -655,29 +777,33 @@ public partial class MainWindow : Window
             {
                 var d = start.AddDays(col * 7 + row);
                 int sec = per.GetValueOrDefault(d);
-                HeatGrid.Children.Add(new Border
+                var sq = new Border
                 {
-                    Height = 18, Margin = new Thickness(2), CornerRadius = new CornerRadius(4),
-                    Background = d > Today ? Brushes.Transparent : HeatBrush(acc, StatsMath.Level(sec, goalSec)),
-                    BorderBrush = d == Today ? Res("Text") : null,
-                    BorderThickness = new Thickness(d == Today ? 1.5 : 0),
+                    Width = 26, Height = 26, Margin = new Thickness(3), CornerRadius = new CornerRadius(8),
+                    Background = d > Today ? Brushes.Transparent : HeatBrush(acc, StatsMath.Level(sec, goalSec), empty),
                     ToolTip = d > Today ? null : $"{d.ToString("d MMMM dddd", Tr)}: {Fmt(sec)}"
-                });
+                };
+                if (d == Today)
+                {
+                    sq.BorderThickness = new Thickness(2.5);
+                    sq.SetResourceReference(Border.BorderBrushProperty, "AccentDeep");
+                }
+                HeatGrid.Children.Add(sq);
             }
 
         HeatLegend.Children.Clear();
-        HeatLegend.Children.Add(new TextBlock { Text = "az", Foreground = Res("Muted"), FontSize = 12, Margin = new Thickness(0, 0, 6, 0) });
+        HeatLegend.Children.Add(new TextBlock { Text = "az", Foreground = Res("Muted"), FontSize = 12, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
         for (int l = 0; l <= 4; l++)
             HeatLegend.Children.Add(new Border
             {
-                Width = 14, Height = 14, Margin = new Thickness(2, 0, 2, 0), CornerRadius = new CornerRadius(4), Background = HeatBrush(acc, l)
+                Width = 16, Height = 16, Margin = new Thickness(2, 0, 2, 0), CornerRadius = new CornerRadius(5), Background = HeatBrush(acc, l, empty)
             });
-        HeatLegend.Children.Add(new TextBlock { Text = "çok", Foreground = Res("Muted"), FontSize = 12, Margin = new Thickness(6, 0, 0, 0) });
+        HeatLegend.Children.Add(new TextBlock { Text = "çok", Foreground = Res("Muted"), FontSize = 12, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) });
     }
 
-    static Brush HeatBrush(Color acc, int level) => level == 0
-        ? new SolidColorBrush(Color.FromArgb(0x16, 255, 255, 255))
-        : new SolidColorBrush(Color.FromArgb((byte)(level switch { 1 => 0x55, 2 => 0x88, 3 => 0xBB, _ => 0xFF }), acc.R, acc.G, acc.B));
+    static Brush HeatBrush(Color acc, int level, Brush empty) => level == 0
+        ? empty
+        : new SolidColorBrush(Lighten(acc, level switch { 1 => 0.72, 2 => 0.48, 3 => 0.24, _ => 0 }));
 
     void UpdateWeekly(Dictionary<DateTime, int> per)
     {
@@ -691,6 +817,7 @@ public partial class MainWindow : Window
                 $"{mon.ToString("d MMM", Tr)} haftası: {Fmt(w[i])}", i == 7));
         }
         BuildBars(WeekGrid, items, 1, true);
+        WeekEmpty.Visibility = items.All(x => x.sec == 0) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void UpdateHourly()
@@ -702,9 +829,66 @@ public partial class MainWindow : Window
         for (int i = 0; i < 24; i++)
             items.Add((i % 3 == 0 ? i.ToString("00") : "", (int)h[i], $"{i:00}:00–{i:00}:59 arası toplam: {Fmt(h[i])}", i == DateTime.Now.Hour));
         BuildBars(HourGrid, items, 1, false);
+        HourEmpty.Visibility = items.All(x => x.sec == 0) ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    // Ortak çubuk grafik: en yüksek değer 130 px'e ölçeklenir.
+    // Tek çubuk: üstte (isteğe bağlı) değer, altta tamamen yuvarlak çubuk. Vurgulu (bugün / bu hafta / bu saat) çubuk tema renginde.
+    // En yüksek değer 130 px'e ölçeklenir; boş değerler küçük bir nokta olarak görünür.
+    StackPanel BarStack(int sec, double max, bool hi, double maxWidth, bool showValue)
+    {
+        var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom };
+        if (showValue && sec > 0)
+        {
+            var val = new TextBlock
+            {
+                Text = ShortTime(sec), FontSize = 11, FontWeight = hi ? FontWeights.ExtraBold : FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 4), TextWrapping = TextWrapping.NoWrap
+            };
+            if (hi) val.SetResourceReference(TextBlock.ForegroundProperty, "AccentDeep");
+            else val.Foreground = Res("Muted");
+            stack.Children.Add(val);
+        }
+        if (sec > 0)
+        {
+            var bar = new Border
+            {
+                Height = Math.Max(sec / max * 130, 8), MaxWidth = maxWidth,
+                // Yarıçap kutunun yarısını aşarsa WPF kırpar: kısa çubuklar da hap biçiminde kalır.
+                CornerRadius = new CornerRadius(maxWidth / 2)
+            };
+            bar.SetResourceReference(Border.BackgroundProperty, hi ? "Accent" : "AccentDim");
+            stack.Children.Add(bar);
+        }
+        else
+        {
+            var dot = new Border { Width = 6, Height = 6, CornerRadius = new CornerRadius(3), HorizontalAlignment = HorizontalAlignment.Center };
+            dot.SetResourceReference(Border.BackgroundProperty, hi ? "AccentDim" : "Track");
+            stack.Children.Add(dot);
+        }
+        return stack;
+    }
+
+    // Çubuğun altındaki etiket; vurgulu olan küçük pastel bir hap içinde.
+    UIElement BarLabel(string text, bool hi)
+    {
+        var tb = new TextBlock
+        {
+            Text = text, FontSize = 11, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.NoWrap,
+            FontWeight = hi ? FontWeights.Black : FontWeights.Bold
+        };
+        if (hi) tb.SetResourceReference(TextBlock.ForegroundProperty, "AccentDeep");
+        else tb.Foreground = Res("Muted");
+        if (!hi) return new Border { Child = tb, Padding = new Thickness(0, 2, 0, 2), Margin = new Thickness(0, 6, 0, 0) };
+        var pill = new Border
+        {
+            Child = tb, CornerRadius = new CornerRadius(9), Padding = new Thickness(6, 2, 6, 2),
+            Margin = new Thickness(0, 6, 0, 0), HorizontalAlignment = HorizontalAlignment.Center
+        };
+        pill.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+        return pill;
+    }
+
+    // Ortak çubuk grafik (haftalık, saatlik).
     void BuildBars(System.Windows.Controls.Primitives.UniformGrid host, List<(string label, int sec, string tip, bool hi)> items, int minMax, bool showValues)
     {
         host.Children.Clear();
@@ -714,25 +898,9 @@ public partial class MainWindow : Window
             var cell = new Grid { Margin = new Thickness(showValues ? 4 : 1.5, 0, showValues ? 4 : 1.5, 0), Background = Brushes.Transparent, ToolTip = tip };
             cell.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             cell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom };
-            if (showValues && sec > 0)
-                stack.Children.Add(new TextBlock
-                {
-                    Text = ShortTime(sec), FontSize = 11, Foreground = Res("Muted"),
-                    HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 3)
-                });
-            stack.Children.Add(new Border
-            {
-                Height = sec > 0 ? Math.Max(sec / max * 130, 3) : 2,
-                Background = hi ? Res("Accent") : Res("AccentDim"),
-                CornerRadius = new CornerRadius(4, 4, 0, 0)
-            });
-            cell.Children.Add(stack);
-            var lb = new TextBlock
-            {
-                Text = label, FontSize = 11, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 6, 0, 0), Height = 18,
-                Foreground = hi ? Res("Text") : Res("Muted"), TextWrapping = TextWrapping.NoWrap
-            };
+            cell.Children.Add(BarStack(sec, max, hi, showValues ? 40 : 14, showValues));
+            // Saatlik grafikte etiketsiz sütunlarda hap çizilmez.
+            var lb = BarLabel(label, hi && label.Length > 0);
             Grid.SetRow(lb, 1);
             cell.Children.Add(lb);
             host.Children.Add(cell);
@@ -750,33 +918,52 @@ public partial class MainWindow : Window
             .ToList();
         if (rows.Count == 0)
         {
-            BreakdownPanel.Children.Add(new TextBlock { Text = "Bu dönemde kayıt yok.", Foreground = Res("Muted") });
+            string when = period switch { "today" => "Bugün", "week" => "Bu hafta", "month" => "Bu ay", _ => "Şimdiye kadar" };
+            BreakdownPanel.Children.Add(EmptyState("IconChart", $"{when} henüz kayıt yok",
+                "Bir ders seçip başlat; derslerin burada renkli çubuklarla dizilecek."));
             return;
         }
         double total = rows.Sum(x => x.sec);
         foreach (var (c, sec) in rows)
         {
             double pct = sec / total * 100;
+            var col = CourseColor(c.Color);
+
             var head = new DockPanel();
-            var right = new TextBlock { Text = $"{Fmt(sec)}   %{pct:0}", Foreground = Res("Muted") };
+            var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            right.Children.Add(new TextBlock
+            {
+                Text = Fmt(sec), Foreground = Res("Text"), FontSize = 13, FontWeight = FontWeights.ExtraBold,
+                VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0)
+            });
+            right.Children.Add(Pill($"%{pct:0}", new SolidColorBrush(Lighten(col, 0.82)), new SolidColorBrush(Tint(col, 0.62, 0)), true));
             DockPanel.SetDock(right, Dock.Right);
             head.Children.Add(right);
-            head.Children.Add(new TextBlock { Text = c.Name, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+            var dot = new System.Windows.Shapes.Ellipse
+            {
+                Width = 12, Height = 12, Fill = new SolidColorBrush(col), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0)
+            };
+            DockPanel.SetDock(dot, Dock.Left);
+            head.Children.Add(dot);
+            head.Children.Add(new TextBlock
+            {
+                Text = c.Name, Foreground = Res("Text"), FontSize = 14, FontWeight = FontWeights.ExtraBold,
+                VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis
+            });
 
-            var bar = new Grid { Height = 8, Margin = new Thickness(0, 8, 0, 0) };
+            var bar = new Grid { Height = 12, Margin = new Thickness(22, 8, 0, 0) };
             bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(pct, GridUnitType.Star) });
             bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100 - pct, GridUnitType.Star) });
-            var bg = new Border { Background = Res("Panel2"), CornerRadius = new CornerRadius(4) };
+            var bg = new Border { Background = Res("Track"), CornerRadius = new CornerRadius(6) };
             Grid.SetColumnSpan(bg, 2);
             bar.Children.Add(bg);
-            bar.Children.Add(new Border { Background = ParseBrush(c.Color), CornerRadius = new CornerRadius(4) });
-
-            BreakdownPanel.Children.Add(new Border
+            bar.Children.Add(new Border
             {
-                Background = Res("Panel"), CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(14, 12, 14, 14), Margin = new Thickness(0, 0, 0, 8),
-                Child = new StackPanel { Children = { head, bar } }
+                Background = new LinearGradientBrush(Lighten(col, 0.35), col, 0),
+                CornerRadius = new CornerRadius(6)
             });
+
+            BreakdownPanel.Children.Add(new StackPanel { Margin = new Thickness(0, 4, 0, 14), Children = { head, bar } });
         }
     }
 
@@ -792,7 +979,7 @@ public partial class MainWindow : Window
         foreach (var d in days)
         {
             int sec = per.GetValueOrDefault(d);
-            double h = sec / max * 130;
+            bool today = d == Today;
             var cell = new Grid
             {
                 Margin = new Thickness(3, 0, 3, 0),
@@ -801,69 +988,115 @@ public partial class MainWindow : Window
             };
             cell.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             cell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            cell.Children.Add(BarStack(sec, max, today, 30, true));
 
-            var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom };
-            if (sec > 0)
-                stack.Children.Add(new TextBlock
-                {
-                    Text = ShortTime(sec), FontSize = 11, Foreground = Res("Muted"),
-                    HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 3)
-                });
-            stack.Children.Add(new Border
-            {
-                Height = sec > 0 ? Math.Max(h, 3) : 2,
-                Background = d == Today ? Res("Accent") : Res("AccentDim"),
-                CornerRadius = new CornerRadius(4, 4, 0, 0)
-            });
-            cell.Children.Add(stack);
-
-            var label = new TextBlock
-            {
-                Text = $"{Tr.DateTimeFormat.AbbreviatedDayNames[(int)d.DayOfWeek]}\n{d.Day}",
-                FontSize = 11, TextAlignment = TextAlignment.Center,
-                Foreground = d == Today ? Res("Text") : Res("Muted"),
-                Margin = new Thickness(0, 6, 0, 0)
-            };
+            var label = BarLabel($"{Tr.DateTimeFormat.AbbreviatedDayNames[(int)d.DayOfWeek]}\n{d.Day}", today);
             Grid.SetRow(label, 1);
             cell.Children.Add(label);
             ChartGrid.Children.Add(cell);
         }
+        ChartEmpty.Visibility = days.All(d => per.GetValueOrDefault(d) == 0) ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    // Geçmiş: günlere göre gruplanmış kartlar. Her satırda ders rengi rozeti, saat aralığı ve süre hapları, sil düğmesi.
     void UpdateHistory()
     {
         HistoryPanel.Children.Clear();
         var list = data.Sessions.OrderByDescending(s => s.Start).Take(300).ToList();
         if (list.Count == 0)
         {
-            HistoryPanel.Children.Add(new TextBlock { Text = "Henüz kayıtlı çalışma yok.", Foreground = Res("Muted") });
-            return;
-        }
-        foreach (var s in list)
-        {
-            var course = data.Courses.FirstOrDefault(c => c.Id == s.CourseId);
-            var g = new Grid();
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var date = new TextBlock { Text = s.Start.ToString("d MMM yyyy HH:mm", Tr), Foreground = Res("Muted"), VerticalAlignment = VerticalAlignment.Center };
-            var name = new TextBlock { Text = course?.Name ?? "(silinmiş ders)", VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-            var dur = new TextBlock { Text = Fmt(s.Seconds), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-            var del = new Button { Content = "✕", Style = (Style)FindResource("Btn"), Padding = new Thickness(10, 4, 10, 4), ToolTip = "Bu kaydı sil" };
-            var session = s;
-            del.Click += (_, _) => { data.DeleteSession(session); Save(); UpdateAll(); };
-
-            Grid.SetColumn(name, 1); Grid.SetColumn(dur, 2); Grid.SetColumn(del, 3);
-            g.Children.Add(date); g.Children.Add(name); g.Children.Add(dur); g.Children.Add(del);
-
             HistoryPanel.Children.Add(new Border
             {
-                Background = Res("Panel"), CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(14, 8, 8, 8), Margin = new Thickness(0, 0, 0, 4), Child = g
+                Style = (Style)FindResource("Card"), Margin = new Thickness(0, 10, 0, 0),
+                Child = EmptyState("IconHistory", "Henüz kayıtlı çalışma yok",
+                    "İlk oturumunu bitirdiğinde burada görünecek. Haydi, bir ders seç ve başla!")
             });
+            return;
         }
+        bool first = true;
+        foreach (var day in list.GroupBy(s => s.Start.Date))
+        {
+            var d = day.Key;
+            string title = d == Today ? "Bugün"
+                : d == Today.AddDays(-1) ? "Dün"
+                : d.Year == Today.Year ? d.ToString("d MMMM dddd", Tr)
+                : d.ToString("d MMMM yyyy, dddd", Tr);
+            int count = day.Count();
+            int daySec = day.Sum(s => s.Seconds);
+
+            var head = new DockPanel { Margin = new Thickness(6, first ? 10 : 24, 4, 10) };
+            var sum = Pill($"{count} oturum · {Fmt(daySec)}", Res("Surface"), Res("Muted"));
+            DockPanel.SetDock(sum, Dock.Right);
+            head.Children.Add(sum);
+            head.Children.Add(new TextBlock
+            {
+                Text = title, Foreground = Res("Text"), FontSize = 16, FontWeight = FontWeights.ExtraBold, VerticalAlignment = VerticalAlignment.Center
+            });
+            HistoryPanel.Children.Add(head);
+            first = false;
+
+            var rows = new StackPanel();
+            bool firstRow = true;
+            foreach (var s in day)
+            {
+                if (!firstRow)
+                    rows.Children.Add(new Border { Height = 1, Background = Res("Line"), Margin = new Thickness(48, 0, 6, 0) });
+                firstRow = false;
+                rows.Children.Add(HistoryRow(s));
+            }
+            HistoryPanel.Children.Add(new Border { Style = (Style)FindResource("Card"), Padding = new Thickness(14, 6, 10, 6), Child = rows });
+        }
+    }
+
+    UIElement HistoryRow(Session s)
+    {
+        var course = data.Courses.FirstOrDefault(c => c.Id == s.CourseId);
+        var col = CourseColor(course?.Color);
+        var g = new Grid { Margin = new Thickness(0, 8, 0, 8) };
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var badge = new Border
+        {
+            Width = 36, Height = 36, CornerRadius = new CornerRadius(18), Margin = new Thickness(0, 0, 12, 0),
+            Background = new SolidColorBrush(Lighten(col, 0.8)),
+            Child = new System.Windows.Shapes.Ellipse { Width = 12, Height = 12, Fill = new SolidColorBrush(col) }
+        };
+        var name = new TextBlock
+        {
+            Text = course?.Name ?? "(silinmiş ders)", FontSize = 14, FontWeight = FontWeights.ExtraBold,
+            Foreground = course == null ? Res("Muted") : Res("Text"),
+            VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        var end = s.Start.AddSeconds(s.Seconds);
+        var time = Pill($"{s.Start:HH:mm} – {end:HH:mm}", Res("Panel2"), Res("Muted"));
+        time.Margin = new Thickness(10, 0, 8, 0);
+        var durText = new TextBlock { Text = Fmt(s.Seconds), FontSize = 12, FontWeight = FontWeights.ExtraBold, HorizontalAlignment = HorizontalAlignment.Center };
+        durText.SetResourceReference(TextBlock.ForegroundProperty, "AccentDeep");
+        var dur = new Border
+        {
+            CornerRadius = new CornerRadius(11), Padding = new Thickness(10, 3, 10, 4), MinWidth = 76,
+            VerticalAlignment = VerticalAlignment.Center, Child = durText
+        };
+        dur.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+
+        var del = new Button
+        {
+            Style = (Style)FindResource("Ghost"), Padding = new Thickness(8), Margin = new Thickness(6, 0, 0, 0),
+            ToolTip = "Bu kaydı sil", VerticalAlignment = VerticalAlignment.Center,
+            Content = new System.Windows.Shapes.Path { Data = (Geometry)FindResource("IconTrash"), Style = (Style)FindResource("Icon"), Width = 16, Height = 16 }
+        };
+        del.MouseEnter += (_, _) => del.Foreground = Res("Danger");
+        del.MouseLeave += (_, _) => del.Foreground = Res("Muted");
+        var session = s;
+        del.Click += (_, _) => { data.DeleteSession(session); Save(); UpdateAll(); };
+
+        Grid.SetColumn(name, 1); Grid.SetColumn(time, 2); Grid.SetColumn(dur, 3); Grid.SetColumn(del, 4);
+        g.Children.Add(badge); g.Children.Add(name); g.Children.Add(time); g.Children.Add(dur); g.Children.Add(del);
+        return g;
     }
 
     // ---------- hedef, dışa aktarma, klavye ----------
