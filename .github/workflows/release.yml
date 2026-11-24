@@ -40,23 +40,32 @@ jobs:
         run: dotnet workload install maui-android
       - name: APK derle
         run: |
-          args=(-f net10.0-android -c Release -o out-apk -p:AndroidSdkDirectory="$ANDROID_HOME" -p:ApplicationVersion=${{ github.run_number }} -p:ApplicationDisplayVersion=$VERSION)
+          args=(-f net10.0-android -c Release -p:AndroidSdkDirectory="$ANDROID_HOME" -p:ApplicationVersion=${{ github.run_number }} -p:ApplicationDisplayVersion=$VERSION)
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
             echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/flowstate.keystore"
             args+=(-p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$RUNNER_TEMP/flowstate.keystore" -p:AndroidSigningKeyAlias=flowstate
-                   -p:AndroidSigningStorePass=env:ANDROID_KEY_PASSWORD -p:AndroidSigningKeyPass=env:ANDROID_KEY_PASSWORD
-                   "-p:AndroidPackageFormats=apk%3Baab")
+                   -p:AndroidSigningStorePass=env:ANDROID_KEY_PASSWORD -p:AndroidSigningKeyPass=env:ANDROID_KEY_PASSWORD)
           else
             echo "::warning::ANDROID_KEYSTORE_BASE64 yok: APK geçici anahtarla imzalandı; eski sürümün üstüne kurulamayabilir (docs/GUVENLIK.md)."
-            args+=(-p:AndroidPackageFormats=apk)
           fi
-          dotnet publish Mobile/FlowState.Mobile.csproj "${args[@]}"
-          rm -f "$RUNNER_TEMP/flowstate.keystore"
-      - name: Dosyaları adlandır
+          dotnet publish Mobile/FlowState.Mobile.csproj "${args[@]}" -p:AndroidPackageFormats=apk -o out-apk
+          find out-apk Mobile/bin -name '*.apk' -exec ls -la {} + || true
+          cp "$(find out-apk Mobile/bin -name '*-Signed.apk' | head -1)" FlowState.apk
+      - name: İmzayı denetle
         run: |
-          cp "$(ls out-apk/*-Signed.apk | head -1)" FlowState.apk
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && ls out-apk/*-Signed.aab >/dev/null 2>&1; then cp "$(ls out-apk/*-Signed.aab | head -1)" FlowState.aab; fi
-          ls -la FlowState.*
+          cert=$("$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner" verify --print-certs FlowState.apk)
+          echo "$cert"
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && echo "$cert" | grep -q "Android Debug"; then echo "::error::APK kalıcı anahtarla imzalanmamış."; exit 1; fi
+      # Play Console'a yüklenecek paket; Releases'a konmaz, olmazsa sürümü engellemez.
+      - name: Play paketi (AAB)
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        continue-on-error: true
+        run: |
+          dotnet publish Mobile/FlowState.Mobile.csproj -f net10.0-android -c Release -p:AndroidSdkDirectory="$ANDROID_HOME" -p:ApplicationVersion=${{ github.run_number }} -p:ApplicationDisplayVersion=$VERSION             -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$RUNNER_TEMP/flowstate.keystore" -p:AndroidSigningKeyAlias=flowstate             -p:AndroidSigningStorePass=env:ANDROID_KEY_PASSWORD -p:AndroidSigningKeyPass=env:ANDROID_KEY_PASSWORD -p:AndroidPackageFormats=aab -o out-aab
+          cp "$(find out-aab Mobile/bin -name '*-Signed.aab' | head -1)" FlowState.aab
+      - name: Anahtarı sil
+        if: always()
+        run: rm -f "$RUNNER_TEMP/flowstate.keystore"
       - uses: actions/upload-artifact@v4
         with:
           name: apk
