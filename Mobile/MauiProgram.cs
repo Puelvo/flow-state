@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace FlowState.Mobile;
 
@@ -11,20 +11,23 @@ public static class MauiProgram
 			.UseMauiApp<App>()
 			.ConfigureFonts(fonts =>
 			{
-				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+				fonts.AddFont("Nunito_600SemiBold.ttf", "N6");
+				fonts.AddFont("Nunito_700Bold.ttf", "N7");
+				fonts.AddFont("Nunito_800ExtraBold.ttf", "N8");
+				fonts.AddFont("Nunito_900Black.ttf", "N9");
 			});
 
 #if ANDROID
-		// Entry: alt çizgiyi kaldır, yuvarlatılmış köşeli kutu yap
+		builder.ConfigureMauiHandlers(h =>
+		{
+			h.AddHandler<PixelView, PixelViewHandler>();
+			h.AddHandler<SceneView, SceneViewHandler>();
+		});
+
+		// Entry: alt çizgi yok (kutusunu çevresindeki yuvarlak Border çizer)
 		Microsoft.Maui.Handlers.EntryHandler.Mapper.AppendToMapping("RoundedEntry", (handler, view) =>
 		{
-			var d = handler.PlatformView.Context!.Resources!.DisplayMetrics!.Density;
-			var bg = new Android.Graphics.Drawables.GradientDrawable();
-			bg.SetColor(Android.Graphics.Color.Argb(179, 28, 36, 71));
-			bg.SetCornerRadius(14 * d);
-			handler.PlatformView.Background = bg;
-			handler.PlatformView.SetPadding((int)(14 * d), (int)(10 * d), (int)(14 * d), (int)(10 * d));
+			handler.PlatformView.Background = null;
 		});
 #endif
 

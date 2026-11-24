@@ -7,7 +7,7 @@ GitHub deposunun **Releases** bölümünden en son sürümü aç:
 - **Windows:** `FlowState-Windows.exe` dosyasını indirip çift tıkla. .NET kurulumu gerekmez.
 - **Android:** `FlowState.apk` dosyasını telefona indirip kur. İlk kurulumda "bilinmeyen kaynaklardan yüklemeye izin ver" açılmalı.
 
-Geliştirme için: masaüstünde `dist\FlowState.exe` (.NET 9 Desktop Runtime gerekir), telefonda `dist\FlowState.apk`.
+İndirilen dosyayı doğrulamak, güvenlik uyarıları ve imzalama: [docs/GUVENLIK.md](docs/GUVENLIK.md). Mağazalara çıkış: [docs/YAYIN.md](docs/YAYIN.md).
 
 ## Özellikler
 - **Çalış:** Sayaç rakamı yok; çalıştıkça dolan bir çember var. Her saat çember 1 tur atar, tamamlanan saatler altta nokta olarak görünür. Çember dersin rengini alır (geçişli).
@@ -19,7 +19,7 @@ Geliştirme için: masaüstünde `dist\FlowState.exe` (.NET 9 Desktop Runtime ge
 - **İstatistik:** bugün / hafta / ay / toplam süre, seri (güncel / en uzun / çalışılan gün), döneme göre ders dağılımı, son 14 gün grafiği, 18 haftalık ısı haritası
 - **Geçmiş:** oturum listesi, tek tek silme, CSV (Excel) dışa aktarma
 - **Widget modu (masaüstü):** küçük, üstte kalan, sürüklenebilir pencere; halkaya tıkla başlat/duraklat
-- **Android:** masaüstüyle aynı tasarım, çalışırken bildirim (duraklat/bitir), ekranı açık tut, elle kayıt, ana ekran widget'ı (4x1: halka, ders, durum, oynat/durdur)
+- **Android:** masaüstüyle aynı bahçe, güneş saat, jeep, dostlar, market ve koyu tema; çalışırken bildirim (duraklat/bitir), ekranı açık tut, piksel bahçeli ana ekran widget'ı (4x2 önerilir, 4x1'e küçülür)
 - **Senkron:** Supabase hesabıyla telefon ve bilgisayar aynı veriyi paylaşır; aktif seans da senkronlanır. Aynı adlı dersler tek derse birleşir. Veriler önce cihazda tutulur, internet yokken de çalışır.
 - Veriler `%APPDATA%\FlowState\data.json` içinde saklanır; 15 sn'de bir otomatik kayıt, çökme olsa bile oturum kaybolmaz
 - Günlük hedef özelliği kaldırıldı (veri modelinde `DailyGoalHours` alanı uyumluluk için duruyor, kullanılmıyor)

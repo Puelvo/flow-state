@@ -292,178 +292,23 @@ public partial class MainWindow
 
     // ---------- sprite'lar ----------
 
-    static readonly uint[] FlowerColors = { 0xFFFFB4D2, 0xFFFAF8F2, 0xFFFFE27A, 0xFFC9B6FF, 0xFFFF9F8A };
-    static readonly Dictionary<int, BitmapSource> flowerCache = new();
 
-    static uint Shade(uint c) => 0xFF000000u | (uint)(((c >> 16) & 255) * 0.82) << 16 | (uint)(((c >> 8) & 255) * 0.82) << 8 | (uint)((c & 255) * 0.82);
 
-    static BitmapSource Flower(int i)
-    {
-        int k = i % FlowerColors.Length;
-        if (flowerCache.TryGetValue(k, out var b)) return b;
-        uint petal = FlowerColors[k], heart = k == 2 ? 0xFFFFFFFF : 0xFFF5B731;
-        // 9×12: beş taç yaprak, ortada göbek, iki yapraklı sap.
-        return flowerCache[k] = Pix(new[] {
-            "...pp....",
-            ".pppppp..",
-            "ppppPpppp",
-            ".ppcccpp.",
-            "pppcccppp",
-            ".pppPppp.",
-            "..pp.pp..",
-            "....g....",
-            ".ll.g....",
-            "..llg.ll.",
-            "....gll..",
-            "....g...." },
-            new() { ['p'] = petal, ['P'] = Shade(petal), ['c'] = heart, ['g'] = 0xFF5E9A45, ['l'] = 0xFF7DBA58 });
-    }
+    static BitmapSource Flower(int i) => B(PixelArt.Flower(i));
 
-    static readonly Dictionary<(int, bool), BitmapSource> treeCache = new();
 
-    /// <summary>Seri ağacı: evreye göre boy; yapraksız (bare) hâlde yalnız gövde ve dallar, dibinde dökülmüş yapraklar.</summary>
-    static BitmapSource StreakTree(int stage, bool bare)
-    {
-        if (treeCache.TryGetValue((stage, bare), out var b)) return b;
-        (int W, int H, int crown, int trunkH) = stage switch
-        {
-            0 => (7, 4, 0, 0), 1 => (7, 7, 0, 3), 2 => (11, 15, 4, 7), 3 => (17, 23, 6, 10), 4 => (23, 31, 9, 13), _ => (27, 35, 11, 14)
-        };
-        var px = new uint[W * H];
-        void Set(int x, int y, uint c) { if (x >= 0 && x < W && y >= 0 && y < H) px[y * W + x] = c; }
-        int cx = W / 2;
-        const uint soil = 0xFFB98E58, bark = 0xFF8A6644, barkD = 0xFF6E4F33, leaf = 0xFF7DBA58, leafL = 0xFFA9DB7E, leafD = 0xFF5E9A45, fruit = 0xFFFF6B6B, dead = 0xFFD9A35A;
-        // toprak tümseği
-        for (int x = cx - 3; x <= cx + 3; x++) Set(x, H - 1, soil);
-        for (int x = cx - 2; x <= cx + 2; x++) Set(x, H - 2, soil);
-        if (stage == 0) { Set(cx, H - 3, leaf); }
-        else if (stage == 1)
-        {
-            for (int y = H - 3; y >= H - 5; y--) Set(cx, y, leaf);
-            if (!bare) { Set(cx - 1, H - 5, leafL); Set(cx - 2, H - 6, leafL); Set(cx + 1, H - 6, leaf); Set(cx + 2, H - 7, leaf); }
-        }
-        else
-        {
-            int trunkTop = H - 2 - trunkH;
-            for (int y = H - 3; y >= trunkTop; y--) { Set(cx, y, bark); if (stage >= 4) Set(cx + 1, y, barkD); }
-            // dallar
-            for (int k = 1; k <= crown / 2; k++) { Set(cx - k, trunkTop + 2 - k / 2, bark); Set(cx + k + (stage >= 4 ? 1 : 0), trunkTop + 3 - k / 2, bark); }
-            if (!bare)
-            {
-                int ccy = trunkTop - crown / 2 + 1;
-                for (int y = ccy - crown; y <= ccy + crown; y++)
-                    for (int x = cx - crown - 1; x <= cx + crown + 1; x++)
-                    {
-                        double d = Math.Pow((x - cx) / (crown + 1.0), 2) + Math.Pow((y - ccy) / (double)crown, 2);
-                        if (d > 1) continue;
-                        uint c = d > 0.72 ? leafD : (y < ccy - crown / 3 && (x + y) % 3 == 0) ? leafL : leaf;
-                        Set(x, y, c);
-                    }
-                if (stage == 5)
-                    foreach (var (fx, fy) in new[] { (-5, 0), (3, -3), (6, 2), (-2, 4), (0, -6), (-7, -4), (4, 6) })
-                    { Set(cx + fx, ccy + fy, fruit); Set(cx + fx + 1, ccy + fy, 0xFFFF9B9B); }
-            }
-            else
-                foreach (var dx in new[] { -4, -2, 3, 5 }) Set(cx + dx, H - 2, dead);              // dökülmüş yapraklar
-        }
-        return treeCache[(stage, bare)] = Bmp(px, W, H);
-    }
+    static BitmapSource StreakTree(int stage, bool bare) => B(PixelArt.StreakTree(stage, bare));
 
-    static BitmapSource? fenceBmp, signBmp, tentBmp, swingIconBmp;
-    static BitmapSource[]? fireBmp;
 
-    static BitmapSource Fence() => fenceBmp ??= Pix(new[] {
-        ".o....o....o....o....o....o..",
-        "ooo..ooo..ooo..ooo..ooo..ooo.",
-        "wwwwwwwwwwwwwwwwwwwwwwwwwwwww",
-        "dodddddoddddodddddoddddoddddd",
-        ".o....o....o....o....o....o..",
-        "wwwwwwwwwwwwwwwwwwwwwwwwwwwww",
-        "dodddddoddddodddddoddddoddddd",
-        ".o....o....o....o....o....o..",
-        ".o....o....o....o....o....o.." },
-        new() { ['w'] = 0xFFD9B27A, ['d'] = 0xFFB98E58, ['o'] = 0xFFA57C4E });
+    static BitmapSource Fence() => B(PixelArt.Fence());
 
-    static BitmapSource Sign() => signBmp ??= Pix(new[] {
-        "wwwwwwwwwwwwww",
-        "wLLLLLLLLLLLLw",
-        "wLttLtttLttLLw",
-        "wLLLLLLLLLLLLw",
-        "wLtttLttLtttLw",
-        "wLLLLLLLLLLLLw",
-        "wwwwwwwwwwwwww",
-        "......pp......",
-        "......pp......",
-        "......pp......",
-        "......pp......" },
-        new() { ['w'] = 0xFFA57C4E, ['L'] = 0xFFE9CF9E, ['t'] = 0xFF8A6644, ['p'] = 0xFF8A6644 });
+    static BitmapSource Sign() => B(PixelArt.Sign());
 
-    static BitmapSource[] Campfire() => fireBmp ??= new[]
-    {
-        Pix(new[] {
-            "........y.........",
-            ".......yy.........",
-            "......yooy....y...",
-            ".....yoory...yo...",
-            "....yorrroy..yo...",
-            "....orrRrroyyoo...",
-            "...yorRRRrroorry..",
-            "...orrRRRRrrrrro..",
-            "....orrRRRrrrro...",
-            ".....orrrrrrro....",
-            "..ss..ooooooo..s..",
-            ".bbBbbBbbbBbbBbb..",
-            "bBbbBbbBbbBbBbbBb.",
-            ".sss.bbbBbbbb.sss." }, FirePal),
-        Pix(new[] {
-            "..........y.......",
-            ".........yy.......",
-            "...y.....yooy.....",
-            "...oy...yoory.....",
-            "...oy..yorrroy....",
-            "...ooyyorrRrro....",
-            "..yrroorrRRRroy...",
-            "..orrrrrRRRRrro...",
-            "...orrrrRRRrro....",
-            "....orrrrrrro.....",
-            "..s..ooooooo..ss..",
-            ".bbBbbBbbbBbbBbb..",
-            "bBbbBbbBbbBbBbbBb.",
-            ".sss.bbbBbbbb.sss." }, FirePal),
-    };
-    static readonly Dictionary<char, uint> FirePal = new()
-    { ['y'] = 0xFFFFE27A, ['o'] = 0xFFFFA94D, ['r'] = 0xFFFF6B4A, ['R'] = 0xFFFFD27A, ['b'] = 0xFF8A6644, ['B'] = 0xFF6E4F33, ['s'] = 0xFFB8B2A6 };
+    static BitmapSource[] Campfire() => B(PixelArt.Campfire());
 
-    static BitmapSource Tent()
-    {
-        if (tentBmp != null) return tentBmp;
-        const int W = 26, H = 17;
-        var px = new uint[W * H];
-        for (int y = 0; y < H; y++)
-        {
-            int half = (int)Math.Round(y * 12.0 / (H - 1));
-            for (int x = 13 - half; x <= 13 + half; x++)
-            {
-                uint c = x < 13 ? 0xFFF7B267 : 0xFFE8955A;                         // ışıklı / gölgeli yüz
-                if (x == 13 - half || x == 13 + half) c = 0xFFB86B3A;
-                if (y > 7 && Math.Abs(x - 13) <= (y - 7) / 2) c = 0xFF6E4F33;      // kapı
-                px[y * W + x] = c;
-            }
-        }
-        px[0 * W + 13] = 0xFF8A6644;
-        return tentBmp = Bmp(px, W, H);
-    }
+    static BitmapSource Tent() => B(PixelArt.Tent());
 
-    static BitmapSource SwingIcon() => swingIconBmp ??= Pix(new[] {
-        "bbbbbbbbbb",
-        ".r......r.",
-        ".r......r.",
-        ".r......r.",
-        ".r......r.",
-        ".r......r.",
-        "sssssssss.",
-        ".d.....d.." },
-        new() { ['b'] = 0xFF8A6644, ['r'] = 0xFFD9C9A0, ['s'] = 0xFFC98A4E, ['d'] = 0xFF8A6644 });
+    static BitmapSource SwingIcon() => B(PixelArt.SwingIcon());
 
     /// <summary>Akasyanın dalından sarkan, yavaşça sallanan salıncak.</summary>
     FrameworkElement SwingVisual()

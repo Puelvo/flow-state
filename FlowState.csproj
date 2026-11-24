@@ -9,6 +9,15 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
     <AssemblyName>FlowState</AssemblyName>
     <Product>Flow State</Product>
+    <Company>Puelvo</Company>
+    <Authors>Puelvo</Authors>
+    <AssemblyTitle>Flow State</AssemblyTitle>
+    <Description>Flow State: ders çalışma süresi takibi</Description>
+    <Copyright>© 2026 Puelvo</Copyright>
+    <RepositoryUrl>https://github.com/Puelvo/flow-state</RepositoryUrl>
+    <NeutralLanguage>tr-TR</NeutralLanguage>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Deterministic>true</Deterministic>
     <RootNamespace>FlowState</RootNamespace>
   </PropertyGroup>
 

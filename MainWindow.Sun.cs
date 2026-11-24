@@ -233,49 +233,10 @@ public partial class MainWindow
         var key = $"{w}|{sunPalette.Light:X}";
         if (key == hillsFor || hillsImg == null) return;
         hillsFor = key;
-        hillsImg.Source = HillsBitmap(w, LightMul(sunPalette.Light));
+        var hills = PixelArt.Hills(w, PixelArt.LightMul(sunPalette.Light));
+        hillsImg.Source = Bmp(hills.Px, hills.W, hills.H);
         hillsImg.Width = w * PixelScale;
         hillsImg.Height = 48 * PixelScale;
-    }
-
-    static BitmapSource HillsBitmap(int W, Color light)
-    {
-        const int H = 48;
-        var px = new uint[W * H];
-        uint Tint(uint c) => Multiply(c, light);
-        void Set(int x, int y, uint c) { if (x >= 0 && x < W && y >= 0 && y < H) px[y * W + x] = Tint(c); }
-
-        for (int x = 0; x < W; x++)
-        {
-            double far = 27 + 3.5 * Math.Sin(x * 0.035 + 1) + 2 * Math.Sin(x * 0.09);
-            double mid = 34 + 3 * Math.Sin(x * 0.05 + 2.2) + 1.5 * Math.Sin(x * 0.13);
-            double near = 41 + 2 * Math.Sin(x * 0.07 + 0.5) + 1 * Math.Sin(x * 0.19);
-            int yf = (int)Math.Round(far), ym = (int)Math.Round(mid), yn = (int)Math.Round(near);
-            for (int y = yf; y < H; y++)
-            {
-                uint c = y == yf ? 0xFFE0F2CBu : 0xFFCBE8B0u;
-                if (y >= ym) c = y == ym ? 0xFFC9E8A9u : 0xFFB2DC8Eu;
-                if (y >= yn) { if (y == yn) c = 0xFF9DD271u; else break; }          // altı saydam: çimen dokusu
-                Set(x, y, c);
-            }
-        }
-        // Akasyalar (orta tepede), genişliğe yayılmış.
-        for (int tx = 52, k = 0; tx < W - 10; tx += 120 + (k * 37) % 70, k++)
-        {
-            int crown = 9 + (k * 5) % 9;
-            int baseY = (int)Math.Round(34 + 3 * Math.Sin(tx * 0.05 + 2.2) + 1.5 * Math.Sin(tx * 0.13));
-            int top = baseY - 7;
-            for (int y = top; y < baseY + 1; y++) Set(tx, y, 0xFF9C7A54u);
-            Set(tx - 1, top + 2, 0xFF9C7A54u); Set(tx + 1, top + 1, 0xFF9C7A54u);
-            for (int r = 0; r < 3; r++)
-            {
-                int half = crown / 2 - (r == 0 ? 2 : r == 2 ? 1 : 0);
-                for (int x = tx - half; x <= tx + half; x++) Set(x, top - 2 + r, r == 0 ? 0xFF9FD07Au : 0xFF84BD62u);
-            }
-        }
-        var bmp = BitmapSource.Create(W, H, 96, 96, PixelFormats.Bgra32, null, px, W * 4);
-        bmp.Freeze();
-        return bmp;
     }
 
     /// <summary>Gökyüzünde piksel yıldızlar (gece görünür), yavaşça parıldar.</summary>

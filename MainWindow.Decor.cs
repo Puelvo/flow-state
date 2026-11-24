@@ -21,16 +21,13 @@ public partial class MainWindow
 
     // ---------- piksel yardımcıları ----------
 
-    /// <summary>Satır satır harflerle çizilmiş piksel resim. '.' saydam; diğer harfler paletten.</summary>
-    static BitmapSource Pix(string[] rows, Dictionary<char, uint> pal)
-    {
-        int h = rows.Length, w = rows.Max(r => r.Length);
-        var px = new uint[w * h];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < rows[y].Length; x++)
-                if (pal.TryGetValue(rows[y][x], out var c)) px[y * w + x] = c;
-        return Bmp(px, w, h);
-    }
+
+    static readonly Dictionary<PixImg, BitmapSource> artCache = new();
+    static readonly Dictionary<PixImg[], BitmapSource[]> artArrays = new();
+
+    /// <summary>Ortak piksel resmi (PixelArt) WPF görseline çevirir; resim başına bir kez.</summary>
+    static BitmapSource B(PixImg p) => artCache.TryGetValue(p, out var b) ? b : artCache[p] = Bmp(p.Px, p.W, p.H);
+    static BitmapSource[] B(PixImg[] p) => artArrays.TryGetValue(p, out var b) ? b : artArrays[p] = p.Select(B).ToArray();
 
     static BitmapSource Bmp(uint[] px, int w, int h)
     {
@@ -48,181 +45,33 @@ public partial class MainWindow
 
     // ---------- sprite'lar ----------
 
-    static BitmapSource? treeBmp, pondBmp, pondShine, holeBmp, meerkatBmp, leafBmp;
-    static BitmapSource[]? owlBmp, bushBmp, rockBmp, tuftBmp;
 
-    /// <summary>Büyük akasya: yassı şemsiye taç (üstü açık, altı koyu), V dallar, ince gövde.</summary>
-    static BitmapSource Tree()
-    {
-        if (treeBmp != null) return treeBmp;
-        const int W = 56, H = 40, cx = 28;
-        var px = new uint[W * H];
-        void Set(int x, int y, uint c) { if (x >= 0 && x < W && y >= 0 && y < H) px[y * W + x] = c; }
-        int[] half = { 12, 18, 22, 25, 26, 27, 26, 24, 19 };
-        for (int r = 0; r < half.Length; r++)
-            for (int x = cx - half[r]; x <= cx + half[r]; x++)
-            {
-                bool edge = x == cx - half[r] || x == cx + half[r];
-                uint c = r <= 1 ? 0xFFA9DB7Eu : r >= 7 ? 0xFF5E9A45u : 0xFF86C25Eu;
-                if (r == 2 && (x + r) % 5 == 0) c = 0xFFA9DB7Eu;                       // tepede parlak benekler
-                if (r == 6 && (x * 3) % 7 == 0) c = 0xFF6FAA4Du;
-                if (edge && r > 1) c = 0xFF5E9A45u;
-                Set(x, r, c);
-            }
-        const uint bark = 0xFF8A6644u, barkDark = 0xFF6E4F33u;
-        for (int y = 9; y < H; y++) { Set(cx - 1, y, bark); Set(cx, y, bark); Set(cx + 1, y, barkDark); }
-        for (int k = 0; k < 9; k++) { Set(cx - 2 - k, 9 + (8 - k) / 2 + 4, bark); Set(cx + 2 + k, 9 + (8 - k) / 2 + 4, bark); }    // V dallar
-        for (int k = 0; k < 6; k++) { Set(cx - 4 - k * 2, 8, 0xFF5E9A45u); }
-        Set(cx - 2, H - 1, bark); Set(cx + 2, H - 1, barkDark); Set(cx - 2, H - 2, bark); Set(cx + 2, H - 2, barkDark);
-        return treeBmp = Bmp(px, W, H);
-    }
+    static BitmapSource Tree() => B(PixelArt.Tree());
 
-    /// <summary>Gölet: kumlu kenar, açık-koyu su halkaları, kenarda sazlar.</summary>
-    static BitmapSource Pond()
-    {
-        if (pondBmp != null) return pondBmp;
-        const int W = 48, H = 16;
-        var px = new uint[W * H];
-        double cx = 23.5, cy = 9, rx = 21, ry = 6;
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-            {
-                double d = Math.Pow((x - cx) / rx, 2) + Math.Pow((y - cy) / ry, 2);
-                double inner = Math.Pow((x - cx) / (rx - 6), 2) + Math.Pow((y - cy - 0.5) / (ry - 2), 2);
-                if (d <= 1) px[y * W + x] = inner <= 1 ? 0xFF5FB2DCu : 0xFF85CDEBu;
-                else if (d <= 1.22) px[y * W + x] = 0xFFE9D9A6u;                        // kumlu kenar
-            }
-        // Sazlar (sol kenar): koyu yeşil saplar, kahverengi başlar.
-        foreach (var (x, top) in new[] { (3, 2), (5, 0), (7, 3), (42, 3), (44, 1) })
-        {
-            for (int y = top; y < 10; y++) px[y * W + x] = 0xFF5E9A45u;
-            px[top * W + x] = 0xFF8A6644u; px[(top + 1) * W + x] = 0xFF8A6644u;
-        }
-        return pondBmp = Bmp(px, W, H);
-    }
+    static BitmapSource Pond() => B(PixelArt.Pond());
 
-    /// <summary>Göletteki parıltılar (ayrı katman; yavaşça yanıp söner).</summary>
-    static BitmapSource PondShine()
-    {
-        if (pondShine != null) return pondShine;
-        const int W = 48, H = 16;
-        var px = new uint[W * H];
-        foreach (var (x, y, n) in new[] { (15, 7, 4), (27, 9, 3), (21, 11, 2), (31, 6, 2) })
-            for (int i = 0; i < n; i++) px[y * W + x + i] = 0xE6FFFFFFu;
-        return pondShine = Bmp(px, W, H);
-    }
+    static BitmapSource PondShine() => B(PixelArt.PondShine());
 
-    static BitmapSource Bush(int k)
-    {
-        bushBmp ??= new[]
-        {
-            Pix(new[] {
-                "....hhhh.......",
-                "..hhGGGGhh.hh..",
-                ".hGGGGGGGGhGGh.",
-                "hGGGpGGGGGGGGGh",
-                "GGGGGGGGGGpGGGG",
-                "DGGGGGGGGGGGGGD",
-                ".DDDDDDDDDDDDD." }, BushPal),
-            Pix(new[] {
-                "...hhh....",
-                ".hhGGGhh..",
-                "hGGGGGGGh.",
-                "GGGGGGGGGh",
-                "DGGGGGGGGD",
-                ".DDDDDDDD." }, BushPal),
-        };
-        return bushBmp[k % bushBmp.Length];
-    }
+    static BitmapSource Bush(int k) => B(PixelArt.Bush(k));
 
-    static readonly Dictionary<char, uint> BushPal = new()
-    { ['h'] = 0xFFA9DB7E, ['G'] = 0xFF7DBA58, ['D'] = 0xFF5E9A45, ['p'] = 0xFFFF9BB5 };
 
-    static BitmapSource Rock(int k)
-    {
-        var pal = new Dictionary<char, uint> { ['l'] = 0xFFE2DDD2, ['g'] = 0xFFC3BCAE, ['d'] = 0xFF948D80 };
-        rockBmp ??= new[]
-        {
-            Pix(new[] { "..llll...", ".lggggl..", "lggggggg.", "gggggggdd", ".dddddd.." }, pal),
-            Pix(new[] { ".ll...", "lggg..", "gggd..", ".dd..." }, pal),
-        };
-        return rockBmp[k % rockBmp.Length];
-    }
+    static BitmapSource Rock(int k) => B(PixelArt.Rock(k));
 
-    /// <summary>Ön plandaki uzun çim tutamı.</summary>
-    static BitmapSource Tuft(int k)
-    {
-        var pal = new Dictionary<char, uint> { ['a'] = 0xFF6FAE4C, ['b'] = 0xFF8CCB63, ['c'] = 0xFFA9DB7E };
-        tuftBmp ??= new[]
-        {
-            Pix(new[] {
-                "..c.....b.",
-                "..c..b..b.",
-                ".bc..b.ab.",
-                ".bc.ab.a..",
-                "ab.bab.a.c",
-                "abbaab.aac",
-                "aabaaabaac" }, pal),
-            Pix(new[] {
-                "...b...",
-                ".c.b.a.",
-                ".cab.a.",
-                "acabaab",
-                "aaabaaa" }, pal),
-        };
-        return tuftBmp[k % tuftBmp.Length];
-    }
+    static BitmapSource Tuft(int k) => B(PixelArt.Tuft(k));
 
-    static BitmapSource Hole() => holeBmp ??= Pix(new[] {
-        "..rrrrrr..",
-        ".rkkkkkkr.",
-        "rkkkkkkkkr",
-        ".rrrrrrrr." }, new() { ['r'] = 0xFFB98E58, ['k'] = 0xFF5A3D25 });
+    static BitmapSource Hole() => B(PixelArt.Hole());
 
-    static BitmapSource MeerkatBmp() => meerkatBmp ??= Pix(new[] {
-        "..kk...",
-        ".kKKk..",
-        ".KeKe..",
-        ".KKKKn.",
-        "..KK...",
-        ".KLLK..",
-        ".KLLK..",
-        ".KLLK..",
-        "kKLLK..",
-        ".KKKK..",
-        ".KKKK..",
-        ".KKKK.." }, new() { ['K'] = 0xFFD9B27A, ['k'] = 0xFFB98E58, ['L'] = 0xFFF0D6A6, ['e'] = 0xFF3B2C25, ['n'] = 0xFF3B2C25 });
+    static BitmapSource MeerkatBmp() => B(PixelArt.MeerkatBmp());
 
-    static BitmapSource[] Owl() => owlBmp ??= new[]
-    {
-        Pix(new[] { "o.....o", "ooooooo", "oEYoYEo", "ooobooo", "oLLLLLo", ".oLLLo.", "..t.t.." },
-            new() { ['o'] = 0xFF8A6A52, ['E'] = 0xFFFFE27A, ['Y'] = 0xFF3B2C25, ['b'] = 0xFFF5B731, ['L'] = 0xFFC9A889, ['t'] = 0xFFF5B731 }),
-        Pix(new[] { "o.....o", "ooooooo", "oCCoCCo", "ooobooo", "oLLLLLo", ".oLLLo.", "..t.t.." },
-            new() { ['o'] = 0xFF8A6A52, ['C'] = 0xFF6E5442, ['b'] = 0xFFF5B731, ['L'] = 0xFFC9A889, ['t'] = 0xFFF5B731 }),
-    };
+    static BitmapSource[] Owl() => B(PixelArt.Owl());
 
-    static BitmapSource Leaf() => leafBmp ??= Pix(new[] { ".gg", "gg." }, new() { ['g'] = 0xFF86C25E });
+    static BitmapSource Leaf() => B(PixelArt.Leaf());
 
-    static readonly uint[] ButterflyColors = { 0xFFFFB4D2, 0xFFFFE27A, 0xFFB9C8FF, 0xFFFFC09A };
-    static readonly Dictionary<uint, BitmapSource[]> butterflyCache = new();
+    static uint[] ButterflyColors => PixelArt.ButterflyColors;
 
-    static BitmapSource[] Butterfly(uint wing)
-    {
-        if (butterflyCache.TryGetValue(wing, out var f)) return f;
-        var pal = new Dictionary<char, uint> { ['W'] = wing, ['b'] = 0xFF3B2C25 };
-        return butterflyCache[wing] = new[]
-        {
-            Pix(new[] { "WW.WW", "WWbWW", ".WbW.", "..b.." }, pal),
-            Pix(new[] { ".W.W.", "..b..", ".WbW.", "..b.." }, pal),
-        };
-    }
+    static BitmapSource[] Butterfly(uint wing) => B(PixelArt.Butterfly(wing));
 
-    static BitmapSource[]? birdBmp;
-    static BitmapSource[] Bird() => birdBmp ??= new[]
-    {
-        Pix(new[] { "b...b", ".b.b.", "..b.." }, new() { ['b'] = 0xFF4A3D58 }),
-        Pix(new[] { ".....", "bb.bb", "..b.." }, new() { ['b'] = 0xFF4A3D58 }),
-    };
+    static BitmapSource[] Bird() => B(PixelArt.Bird());
 
     // ---------- yerleşim ----------
 

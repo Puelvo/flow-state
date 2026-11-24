@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-	<string name="widget_description">Çalışma süresini gör, başlat, duraklat ve bitir.</string>
+	<string name="widget_description">Bahçeni ve çalışma süreni gör; başlat, duraklat, bitir.</string>
+	<string name="widget_toggle">Başlat ya da duraklat</string>
+	<string name="widget_stop">Bitir</string>
 </resources>

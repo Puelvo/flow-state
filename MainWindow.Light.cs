@@ -9,18 +9,11 @@ namespace FlowState;
 public partial class MainWindow
 {
     /// <summary>Palet ışığının (renk + güç) çarpan hâli; gündüz beyaz. Geçişte gereksiz üretim olmasın diye kademelidir.</summary>
-    static Color LightMul(uint light)
-    {
-        var c = C(light);
-        var m = Mix(Colors.White, Color.FromRgb(c.R, c.G, c.B), c.A / 255.0);
-        static byte Q(byte v) => (byte)Math.Min(255, (v + 2) / 4 * 4);
-        return m == Colors.White ? m : Color.FromRgb(Q(m.R), Q(m.G), Q(m.B));
-    }
+    static Color LightMul(uint light) => C(PixelArt.LightMul(light));
 
     Color lightMul = Colors.White;
 
-    static uint Multiply(uint c, Color m) =>
-        (c & 0xFF000000u) | ((c >> 16 & 255) * m.R / 255) << 16 | ((c >> 8 & 255) * m.G / 255) << 8 | (c & 255) * m.B / 255;
+    static uint Multiply(uint c, Color m) => PixelArt.Multiply(c, 0xFF000000u | (uint)m.R << 16 | (uint)m.G << 8 | m.B);
 
     static Color Multiply(Color c, Color m) => Color.FromArgb(c.A, (byte)(c.R * m.R / 255), (byte)(c.G * m.G / 255), (byte)(c.B * m.B / 255));
 

@@ -1,88 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Ana ekran widget'ı: arkada piksel bahçe (w_scene, kodla çizilir), üstünde ders, süre ve düğmeler. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
 	android:id="@+id/w_root"
 	android:layout_width="match_parent"
-	android:layout_height="match_parent"
-	android:background="@drawable/widget_bg"
-	android:paddingStart="12dp"
-	android:paddingEnd="12dp"
-	android:paddingTop="8dp"
-	android:paddingBottom="8dp">
+	android:layout_height="match_parent">
 
-	<LinearLayout
+	<ImageView
+		android:id="@+id/w_scene"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
-		android:gravity="center_vertical"
-		android:orientation="horizontal">
+		android:contentDescription="@string/widget_description"
+		android:scaleType="fitXY" />
 
-		<FrameLayout
-			android:layout_width="58dp"
-			android:layout_height="58dp">
+	<LinearLayout
+		android:id="@+id/w_info"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_gravity="top|end"
+		android:layout_marginTop="10dp"
+		android:layout_marginEnd="12dp"
+		android:background="@drawable/widget_glass"
+		android:gravity="end"
+		android:orientation="vertical"
+		android:paddingStart="12dp"
+		android:paddingEnd="12dp"
+		android:paddingTop="4dp"
+		android:paddingBottom="5dp">
 
-			<ImageView
-				android:id="@+id/w_ring"
-				android:layout_width="match_parent"
-				android:layout_height="match_parent"
-				android:scaleType="fitCenter" />
-
-			<Chronometer
-				android:id="@+id/w_time"
-				android:layout_width="wrap_content"
-				android:layout_height="wrap_content"
-				android:layout_gravity="center"
-				android:textColor="#EEF1FF"
-				android:textSize="12sp"
-				android:textStyle="bold" />
-		</FrameLayout>
-
-		<LinearLayout
-			android:layout_width="0dp"
+		<TextView
+			android:id="@+id/w_course"
+			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
-			android:layout_marginStart="12dp"
-			android:layout_weight="1"
-			android:gravity="center_vertical"
-			android:orientation="vertical">
+			android:ellipsize="end"
+			android:maxWidth="150dp"
+			android:maxLines="1"
+			android:textColor="#3B2C25"
+			android:textSize="13sp"
+			android:textStyle="bold" />
 
-			<TextView
-				android:id="@+id/w_course"
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:ellipsize="end"
-				android:maxLines="1"
-				android:textColor="#EEF1FF"
-				android:textSize="15sp"
-				android:textStyle="bold" />
+		<Chronometer
+			android:id="@+id/w_time"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:includeFontPadding="false"
+			android:textColor="#3B2C25"
+			android:textSize="25sp"
+			android:textStyle="bold" />
 
-			<TextView
-				android:id="@+id/w_status"
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:ellipsize="end"
-				android:maxLines="1"
-				android:textColor="#8791B5"
-				android:textSize="11sp" />
+		<TextView
+			android:id="@+id/w_status"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:maxLines="1"
+			android:textColor="#8A756A"
+			android:textSize="11sp"
+			android:textStyle="bold" />
+	</LinearLayout>
 
-			<TextView
-				android:id="@+id/w_today"
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:ellipsize="end"
-				android:maxLines="1"
-				android:textColor="#C9D0EE"
-				android:textSize="11sp" />
-		</LinearLayout>
-
-		<ImageView
-			android:id="@+id/w_toggle"
-			android:layout_width="38dp"
-			android:layout_height="38dp"
-			android:layout_gravity="center_vertical" />
+	<LinearLayout
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_gravity="bottom|end"
+		android:layout_marginEnd="12dp"
+		android:layout_marginBottom="8dp"
+		android:orientation="horizontal">
 
 		<ImageView
 			android:id="@+id/w_stop"
-			android:layout_width="38dp"
-			android:layout_height="38dp"
-			android:layout_gravity="center_vertical"
-			android:layout_marginStart="8dp" />
+			android:layout_width="44dp"
+			android:layout_height="40dp"
+			android:layout_marginEnd="8dp"
+			android:contentDescription="@string/widget_stop"
+			android:scaleType="fitCenter" />
+
+		<ImageView
+			android:id="@+id/w_toggle"
+			android:layout_width="56dp"
+			android:layout_height="40dp"
+			android:contentDescription="@string/widget_toggle"
+			android:scaleType="fitCenter" />
 	</LinearLayout>
 </FrameLayout>

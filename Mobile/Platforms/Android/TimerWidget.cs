@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Android.App;
 using Android.Appwidget;
 using Android.Content;
@@ -9,7 +9,7 @@ using Microsoft.Maui.Storage;
 
 namespace FlowState.Mobile;
 
-/// <summary>Ana ekran widget'ı: geçişli halka, canlı süre, ders adı, bugünkü toplam ve başlat/duraklat/bitir düğmeleri.</summary>
+/// <summary>Ana ekran widget'ı: uygulamadaki piksel bahçe (güneş saat, hayvanlar, jeep), canlı süre, ders adı ve başlat/duraklat/bitir düğmeleri.</summary>
 [BroadcastReceiver(Label = "Flow State", Exported = true)]
 [IntentFilter(new[] { "android.appwidget.action.APPWIDGET_UPDATE" })]
 [MetaData("android.appwidget.provider", Resource = "@xml/timer_widget_info")]
@@ -21,6 +21,14 @@ public class TimerWidgetProvider : AppWidgetProvider
 	{
 		base.OnReceive(context, intent);
 		if (intent?.Action == TimerWidget.ActTick) TimerWidget.Refresh();
+	}
+
+	public override void OnAppWidgetOptionsChanged(Context? context, AppWidgetManager? appWidgetManager, int appWidgetId, Bundle? newOptions) => TimerWidget.Refresh();
+
+	public override void OnDeleted(Context? context, int[]? appWidgetIds)
+	{
+		base.OnDeleted(context, appWidgetIds);
+		TimerWidget.Forget(appWidgetIds);
 	}
 
 	public override void OnDisabled(Context? context)
@@ -86,30 +94,43 @@ public static class TimerWidget
 			double todaySec = data.Sessions.Where(s => s.Start >= DateTime.Today).Sum(s => (double)s.Seconds);
 			if (active && new DateTime(long.Parse(p[1])) >= DateTime.Today) todaySec += elapsed;
 
-			AG.Color accent;
-			try { accent = AG.Color.ParseColor(data.WidgetColor); } catch { accent = AG.Color.ParseColor("#5B8CFF"); }
+			uint accent = Accent(data);
+			int target = active && p.Length > 4 && p[4].Length > 0 && p[4] == data.CountdownRunId ? data.CountdownSeconds : 0;
+			var palette = DayCycle.At(DateTime.Now, DayCycle.Parse(data.GardenTheme));
+			double lit = !active ? 0 : target > 0 ? Math.Min(1, elapsed / target) * 60 : elapsed % 3600 / 60;
+			bool nightSky = DayCycle.IsNight(palette);
 
-			var v = new RemoteViews(ctx.PackageName, Layout("widget_timer"));
-			v.SetImageViewBitmap(Id("w_ring"), RingBitmap(active ? elapsed % 3600 / 3600.0 : 0, accent));
-			long baseMs = SystemClock.ElapsedRealtime() - (long)(elapsed * 1000);
-			v.SetChronometer(Id("w_time"), baseMs, null, running);
-			v.SetTextViewText(Id("w_course"), course?.Name ?? "Ders ekle");
-			v.SetTextViewText(Id("w_status"), !active ? "Başlamaya hazır" : running ? "Odaklanıyorsun" : "Duraklatıldı");
-			v.SetTextViewText(Id("w_today"), $"Bugün {Fmt(todaySec)}");
+			foreach (var id in ids)
+			{
+				// Yazılar sığsın diye yaklaşık boyut: dikey ekranda genişlik en az, yükseklik en çok.
+				var opt = mgr.GetAppWidgetOptions(id);
+				int wDp = Math.Clamp(opt?.GetInt(AppWidgetManager.OptionAppwidgetMinWidth, 300) ?? 300, 120, 460);
+				int hDp = Math.Clamp(opt?.GetInt(AppWidgetManager.OptionAppwidgetMaxHeight, 130) ?? 130, 48, 420);
+				bool small = hDp < 92;
 
-			v.SetImageViewBitmap(Id("w_toggle"), ButtonBitmap(active && running ? 1 : 0, accent));
-			v.SetImageViewBitmap(Id("w_stop"), ButtonBitmap(2, accent));
-			v.SetViewVisibility(Id("w_stop"), active ? Android.Views.ViewStates.Visible : Android.Views.ViewStates.Gone);
-			v.SetOnClickPendingIntent(Id("w_toggle"), Broadcast(TimerNotifier.ActToggle, 21));
-			v.SetOnClickPendingIntent(Id("w_stop"), Broadcast(TimerNotifier.ActFinish, 22));
+				var v = new RemoteViews(ctx.PackageName, Layout(small ? "widget_timer_small" : "widget_timer"));
+				v.SetImageViewBitmap(Id("w_scene"), SceneBitmap(id, wDp, hDp, data, palette, active, running, lit));
 
-			var open = new Intent(ctx, typeof(MainActivity)).SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
-			v.SetOnClickPendingIntent(Id("w_root"), PendingIntent.GetActivity(ctx, 20, open, PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent));
-			v.SetOnClickPendingIntent(Id("w_ring"), PendingIntent.GetActivity(ctx, 20, open, PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent));
+				uint fg = nightSky ? 0xFFFFFFFF : 0xFF3B2C25, sub = nightSky ? 0xFFC9D3FF : 0xFF8A756A;
+				v.SetInt(Id("w_info"), "setBackgroundResource", Drawable(nightSky ? "widget_glass_dark" : "widget_glass"));
+				v.SetTextColor(Id("w_course"), Col(fg)); v.SetTextColor(Id("w_time"), Col(fg)); v.SetTextColor(Id("w_status"), Col(sub));
+				if (OperatingSystem.IsAndroidVersionAtLeast(24)) v.SetChronometerCountDown(Id("w_time"), target > 0);
+				long now = SystemClock.ElapsedRealtime();
+				v.SetChronometer(Id("w_time"), target > 0 ? now + (long)((target - elapsed) * 1000) : now - (long)(elapsed * 1000), null, running);
+				v.SetTextViewText(Id("w_course"), course?.Name ?? "Ders ekle");
+				v.SetTextViewText(Id("w_status"), !active ? $"Bugün {Fmt(todaySec)}" : running ? "Odaklanıyorsun" : "Mola");
 
-			mgr.UpdateAppWidget(ids, v);
+				v.SetImageViewBitmap(Id("w_toggle"), ButtonBitmap(active && running ? "pause" : "play", accent, OnAccent(accent), 28, 20));
+				v.SetImageViewBitmap(Id("w_stop"), ButtonBitmap("stop", 0xFFFDE5E7, 0xFFEF5D6C, 22, 20));
+				v.SetViewVisibility(Id("w_stop"), active ? Android.Views.ViewStates.Visible : Android.Views.ViewStates.Gone);
+				v.SetOnClickPendingIntent(Id("w_toggle"), Broadcast(TimerNotifier.ActToggle, 21));
+				v.SetOnClickPendingIntent(Id("w_stop"), Broadcast(TimerNotifier.ActFinish, 22));
+				var open = new Intent(ctx, typeof(MainActivity)).SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
+				v.SetOnClickPendingIntent(Id("w_root"), PendingIntent.GetActivity(ctx, 20, open, PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent));
+				mgr.UpdateAppWidget(id, v);
+			}
 
-			// Çalışırken halkanın ilerlemesi için yarım dakikada bir yenile.
+			// Çalışırken ışınlar ve jeep ilerlesin diye yarım dakikada bir yenile.
 			var am = ctx.GetSystemService(Context.AlarmService) as AlarmManager;
 			if (running) am?.SetAndAllowWhileIdle(AlarmType.ElapsedRealtime, SystemClock.ElapsedRealtime() + TickMs, TickIntent());
 			else CancelTick();
@@ -125,68 +146,42 @@ public static class TimerWidget
 
 	// ---------- çizimler ----------
 
-	static AG.Color Grad(AG.Color a, double t)
+	static int Drawable(string name) => Ctx.Resources!.GetIdentifier(name, "drawable", Ctx.PackageName);
+	internal static AG.Color Col(uint c) => new(unchecked((int)c));
+
+	internal static uint Accent(AppData data)
 	{
-		var (r, g, b) = RingGradient.At((byte)a.R, (byte)a.G, (byte)a.B, t);
-		return new AG.Color(r, g, b);
+		try { return unchecked((uint)AG.Color.ParseColor(data.WidgetColor).ToArgb()); } catch { return 0xFF5B8CFF; }
 	}
 
-	internal static AG.Bitmap RingBitmap(double frac, AG.Color accent)
-	{
-		const int size = 280;
-		var bmp = AG.Bitmap.CreateBitmap(size, size, AG.Bitmap.Config.Argb8888!)!;
-		var c = new AG.Canvas(bmp);
-		float cx = size / 2f, stroke = size * 0.095f, rad = size / 2f - stroke / 2 - 3;
-		var paint = new AG.Paint(AG.PaintFlags.AntiAlias) { StrokeWidth = stroke };
-		paint.SetStyle(AG.Paint.Style.Stroke);
-		paint.Color = new AG.Color(255, 255, 255, 46);
-		c.DrawCircle(cx, cx, rad, paint);
-		if (frac < 0.002) return bmp;
+	internal static uint OnAccent(uint a) => (0.299 * (a >> 16 & 255) + 0.587 * (a >> 8 & 255) + 0.114 * (a & 255)) / 255 > 0.72 ? 0xFF3B2C25 : 0xFFFFFFFF;
 
-		double sweep = Math.Min(frac, 0.9999) * 360;
-		int n = (int)Math.Ceiling(sweep);
-		(float x, float y) P(double deg) { double a = deg * Math.PI / 180; return (cx + rad * (float)Math.Sin(a), cx - rad * (float)Math.Cos(a)); }
-		for (int i = 0; i < n; i++)
-		{
-			var (x0, y0) = P(i); var (x1, y1) = P(Math.Min(i + 1.4, sweep));
-			paint.Color = Grad(accent, (i + 0.7) / 360.0);
-			c.DrawLine(x0, y0, x1, y1, paint);
-		}
-		paint.SetStyle(AG.Paint.Style.Fill);
-		var (sx, sy) = P(0); var (ex, ey) = P(sweep);
-		paint.Color = Grad(accent, 0); c.DrawCircle(sx, sy, stroke / 2, paint);
-		paint.Color = Grad(accent, sweep / 360.0); c.DrawCircle(ex, ey, stroke / 2, paint);
-		return bmp;
+	// Widget başına bir sahne: süreç yaşadıkça hayvanlar ve jeep kaldıkları yerden sürer.
+	static readonly Dictionary<int, (PixelScene Scene, DateTime At)> scenes = new();
+
+	internal static void Forget(int[]? ids) { foreach (var id in ids ?? Array.Empty<int>()) scenes.Remove(id); }
+
+	static AG.Bitmap SceneBitmap(int id, int w, int h, AppData data, SkyPalette palette, bool active, bool running, double lit)
+	{
+		bool fresh = !scenes.TryGetValue(id, out var e);
+		var s = fresh ? new PixelScene(Sprites.Load) { Z = 1, CloudZ = 1 } : e.Scene;
+		WidgetScene.Compose(s, w, h, data, palette, active, running, lit, fresh ? 20 : (DateTime.UtcNow - e.At).TotalSeconds);
+		scenes[id] = (s, DateTime.UtcNow);
+		return Sprites.ToBitmap(s.Buf, s.W, s.H, w * h > 60000 ? 2 : 3);
 	}
 
-	// 0 oynat, 1 duraklat, 2 bitir
-	internal static AG.Bitmap ButtonBitmap(int kind, AG.Color accent)
+	/// <summary>Güneş saat (bildirimde): disk ve ışınlar.</summary>
+	internal static AG.Bitmap SunBitmap(SkyPalette p, bool active, double lit)
 	{
-		const int size = 120;
-		var bmp = AG.Bitmap.CreateBitmap(size, size, AG.Bitmap.Config.Argb8888!)!;
-		var c = new AG.Canvas(bmp);
-		var paint = new AG.Paint(AG.PaintFlags.AntiAlias);
-		paint.SetStyle(AG.Paint.Style.Fill);
-		bool filled = kind != 2;
-		paint.Color = filled ? accent : new AG.Color(255, 255, 255, 40);
-		c.DrawCircle(size / 2f, size / 2f, size / 2f - 2, paint);
+		var rays = PixelArt.SunRays(p, active, lit); var disc = PixelArt.SunDisc(p);
+		var px = (uint[])rays.Px.Clone();
+		for (int i = 0; i < px.Length; i++) if (disc.Px[i] != 0) px[i] = disc.Px[i];
+		return Sprites.ToBitmap(px, rays.W, rays.H, 2);
+	}
 
-		paint.Color = filled ? new AG.Color(10, 14, 26) : new AG.Color(238, 241, 255);
-		if (kind == 0)
-		{
-			var path = new AG.Path();
-			path.MoveTo(size * 0.39f, size * 0.30f); path.LineTo(size * 0.71f, size * 0.50f); path.LineTo(size * 0.39f, size * 0.70f); path.Close();
-			paint.StrokeJoin = AG.Paint.Join.Round;
-			c.DrawPath(path, paint);
-		}
-		else if (kind == 1)
-		{
-			c.DrawRoundRect(new AG.RectF(size * 0.34f, size * 0.30f, size * 0.46f, size * 0.70f), 6, 6, paint);
-			c.DrawRoundRect(new AG.RectF(size * 0.54f, size * 0.30f, size * 0.66f, size * 0.70f), 6, 6, paint);
-		}
-		else c.DrawRoundRect(new AG.RectF(size * 0.34f, size * 0.34f, size * 0.66f, size * 0.66f), 8, 8, paint);
-		return bmp;
+	internal static AG.Bitmap ButtonBitmap(string icon, uint face, uint fg, int w, int h)
+	{
+		var b = PixelArt.Button(w, h, face, PixelArt.Icon(icon, fg));
+		return Sprites.ToBitmap(b.Px, b.W, b.H, 6);
 	}
 }
-
-

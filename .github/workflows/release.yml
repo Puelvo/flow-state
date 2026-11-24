@@ -1,24 +1,32 @@
 # Sürüm: main'e her push'ta Android APK'sını ve tek dosyalık Windows exe'sini derler,
 # GitHub Releases'a yeni bir sürüm olarak koyar (README'deki kurulum adımları buradan indirir).
+# İmza: depo gizli değerleri (secrets) varsa dosyalar kalıcı anahtarla imzalanır; yoksa imzasız (APK'da geçici anahtar) yayımlanır
+# ve iş akışı uyarı verir. Kurulum: docs/GUVENLIK.md
 name: Sürüm
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['**.xaml', '**.cs', 'Assets/**', 'Mobile/**', 'FlowState.csproj', '.github/workflows/release.yml']
+    paths: ['**.xaml', '**.cs', 'Assets/**', 'Mobile/**', 'FlowState.csproj', 'app.manifest', '.github/workflows/release.yml']
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release
   cancel-in-progress: true
 
+env:
+  VERSION: 1.3.${{ github.run_number }}
+
 jobs:
   android:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -31,30 +39,64 @@ jobs:
       - name: MAUI Android iş yükü
         run: dotnet workload install maui-android
       - name: APK derle
-        run: dotnet publish Mobile/FlowState.Mobile.csproj -f net10.0-android -c Release -o out-apk -p:AndroidSdkDirectory="$ANDROID_HOME"
-      - name: APK'yı adlandır
         run: |
-          apk=$(ls out-apk/*-Signed.apk | head -1)
-          cp "$apk" FlowState.apk
-          ls -la FlowState.apk
+          args=(-f net10.0-android -c Release -o out-apk -p:AndroidSdkDirectory="$ANDROID_HOME" -p:ApplicationVersion=${{ github.run_number }} -p:ApplicationDisplayVersion=$VERSION)
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/flowstate.keystore"
+            args+=(-p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$RUNNER_TEMP/flowstate.keystore" -p:AndroidSigningKeyAlias=flowstate
+                   -p:AndroidSigningStorePass=env:ANDROID_KEY_PASSWORD -p:AndroidSigningKeyPass=env:ANDROID_KEY_PASSWORD
+                   "-p:AndroidPackageFormats=apk%3Baab")
+          else
+            echo "::warning::ANDROID_KEYSTORE_BASE64 yok: APK geçici anahtarla imzalandı; eski sürümün üstüne kurulamayabilir (docs/GUVENLIK.md)."
+            args+=(-p:AndroidPackageFormats=apk)
+          fi
+          dotnet publish Mobile/FlowState.Mobile.csproj "${args[@]}"
+          rm -f "$RUNNER_TEMP/flowstate.keystore"
+      - name: Dosyaları adlandır
+        run: |
+          cp "$(ls out-apk/*-Signed.apk | head -1)" FlowState.apk
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && ls out-apk/*-Signed.aab >/dev/null 2>&1; then cp "$(ls out-apk/*-Signed.aab | head -1)" FlowState.aab; fi
+          ls -la FlowState.*
       - uses: actions/upload-artifact@v4
         with:
           name: apk
           path: FlowState.apk
+      # Play Console'a yüklenecek paket; Releases'a konmaz.
+      - uses: actions/upload-artifact@v4
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        with:
+          name: play-aab
+          path: FlowState.aab
+          if-no-files-found: ignore
 
   windows:
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      WINDOWS_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 }}
+      WINDOWS_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
       - name: Tek dosyalık exe derle
-        run: dotnet publish FlowState.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out-win
+        run: dotnet publish FlowState.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=$env:VERSION -p:ContinuousIntegrationBuild=true -o out-win
+        shell: pwsh
       - name: Exe'yi adlandır
         shell: pwsh
         run: Copy-Item out-win\FlowState.exe FlowState-Windows.exe
+      - name: İmzala (sertifika varsa)
+        shell: pwsh
+        run: |
+          if (-not $env:WINDOWS_PFX_BASE64) { Write-Output "::warning::WINDOWS_PFX_BASE64 yok: exe imzasız; SmartScreen uyarı gösterir (docs/GUVENLIK.md)."; exit 0 }
+          $pfx = Join-Path $env:RUNNER_TEMP 'flowstate.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_PFX_BASE64))
+          $tool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Where-Object FullName -match '\\x64\\' | Sort-Object FullName | Select-Object -Last 1
+          & $tool.FullName sign /f $pfx /p $env:WINDOWS_PFX_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /d "Flow State" /du "https://github.com/Puelvo/flow-state" FlowState-Windows.exe
+          $ok = $LASTEXITCODE
+          Remove-Item $pfx -Force
+          if ($ok -ne 0) { exit $ok }
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -63,21 +105,38 @@ jobs:
   release:
     needs: [android, windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+          pattern: '{apk,windows}'
+      - name: Özetler (SHA-256)
+        run: cd dist && sha256sum FlowState.apk FlowState-Windows.exe | tee SHA256SUMS.txt
+      # Dosyaların bu depodan, bu commit'ten derlendiğinin herkesçe doğrulanabilir kanıtı:
+      #   gh attestation verify FlowState-Windows.exe --repo Puelvo/flow-state
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/FlowState.apk
+            dist/FlowState-Windows.exe
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.3.${{ github.run_number }}
-          name: Flow State 1.3.${{ github.run_number }} - Güneş Saat
+          tag_name: v${{ env.VERSION }}
+          name: Flow State ${{ env.VERSION }} - Güneş Saat
           make_latest: true
           body: |
             **Android:** `FlowState.apk` dosyasını telefona indirip kur (ilk kurulumda "bilinmeyen kaynaklardan yüklemeye izin ver").
-            **Windows:** `FlowState-Windows.exe` dosyasını indirip çift tıkla; .NET kurulumu gerekmez.
+            **Windows:** `FlowState-Windows.exe` dosyasını indirip çift tıkla; .NET kurulumu ve yönetici izni gerekmez.
+
+            Dosyalar bu depodaki kaynaktan GitHub Actions ile derlenir. Doğrulamak için: `SHA256SUMS.txt` ya da `gh attestation verify <dosya> --repo Puelvo/flow-state`.
 
             Kaynak: ${{ github.sha }}
           files: |
             dist/FlowState.apk
             dist/FlowState-Windows.exe
+            dist/SHA256SUMS.txt

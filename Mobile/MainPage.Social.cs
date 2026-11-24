@@ -7,7 +7,9 @@ public partial class MainPage
 {
 	static readonly string[] Medals = { "", "🏆", "🥈", "🥉" };
 	static readonly (int days, string label)[] BoardPeriods = { (1, "Bugün"), (3, "3 gün"), (5, "5 gün"), (7, "1 hafta"), (14, "2 hafta"), (30, "1 ay") };
-	static readonly Color Green = Color.FromArgb("#3DDC97"), Amber = Color.FromArgb("#FFB04D"), Offline = Color.FromArgb("#5A6385");
+	static Color Green => T("Good");
+	static Color Amber => T("Warn");
+	static Color Offline => T("Faint");
 
 	SocialService? social;
 	MyProfile? socialMe;
@@ -19,12 +21,9 @@ public partial class MainPage
 	readonly List<Action> socialTicks = new();
 	IDispatcherTimer? socialPoll, socialClock;
 
-	readonly Label socialMsg = Lbl("", 13, false), meLabel = Lbl("", 17, true);
-	readonly VerticalStackLayout socialGate = new() { Spacing = 10 }, socialMain = new(),
-		friendsPane = new(), friendsList = new() { Spacing = 8 },
-		roomsPane = new(), roomsList = new() { Spacing = 8 },
-		boardPane = new(), boardHead = new() { Spacing = 8 }, boardList = new() { Spacing = 8 }, boardInvite = new() { Spacing = 8 };
-	readonly Switch shareSwitch = new();
+	Label socialMsg = null!, meLabel = null!;
+	VerticalStackLayout socialGate = null!, socialMain = null!, friendsPane = null!, friendsList = null!, roomsPane = null!, roomsList = null!, boardPane = null!, boardHead = null!, boardList = null!, boardInvite = null!;
+	Switch shareSwitch = null!;
 	readonly Border[] segs = new Border[2];
 	Entry addFriendEntry = null!;
 
@@ -32,7 +31,11 @@ public partial class MainPage
 
 	View BuildSocialView()
 	{
-		social = new SocialService(sync);
+		social ??= new SocialService(sync);
+		socialMsg = Lbl("", 13, true); meLabel = Lbl("", 17, true);
+		socialGate = new() { Spacing = 10 }; socialMain = new(); friendsPane = new(); friendsList = new() { Spacing = 8 }; roomsPane = new(); roomsList = new() { Spacing = 8 };
+		boardPane = new(); boardHead = new() { Spacing = 8 }; boardList = new() { Spacing = 8 }; boardInvite = new() { Spacing = 8 };
+		shareSwitch = new Switch(); gateKind = boardHeadKey = null; openRoomId = null; socialPane = "friends"; badgeBorder = null;
 		socialMsg.IsVisible = false; socialMsg.Margin = new Thickness(2, 4, 0, 0);
 		socialMain.IsVisible = false;
 
@@ -67,7 +70,7 @@ public partial class MainPage
 		var addBtn = Pill("Arkadaş ekle", true);
 		Tap(addBtn, AddFriend);
 		addFriendEntry.Completed += (_, _) => AddFriend();
-		friendsPane.Children.Add(new VerticalStackLayout { Spacing = 8, Margin = new Thickness(0, 12, 0, 0), Children = { Card(addFriendEntry, 6), addBtn } });
+		friendsPane.Children.Add(new VerticalStackLayout { Spacing = 8, Margin = new Thickness(0, 12, 0, 0), Children = { Boxed(addFriendEntry), addBtn } });
 		friendsPane.Children.Add(friendsList);
 		socialMain.Children.Add(friendsPane);
 
@@ -84,22 +87,26 @@ public partial class MainPage
 		boardPane.IsVisible = false;
 		socialMain.Children.Add(boardPane);
 
+		if (socialPoll == null) StartSocialTimers();
+		StyleSegs();
+
+		return Scroll(new VerticalStackLayout
+		{
+			Padding = new Thickness(20, 8, 20, 120),
+			Children = { Big("Sosyal"), Sub("Arkadaşlarınla birlikte odaklan."), socialMsg, socialGate, socialMain }
+		});
+	}
+
+	void StartSocialTimers()
+	{
 		socialPoll = Dispatcher.CreateTimer(); socialPoll.Interval = TimeSpan.FromSeconds(8);
 		socialPoll.Tick += (_, _) => _ = SocialRefresh();
 		socialClock = Dispatcher.CreateTimer(); socialClock.Interval = TimeSpan.FromSeconds(1);
 		socialClock.Tick += (_, _) => { foreach (var t in socialTicks.ToList()) t(); };
-		StyleSegs();
-
 		pendingTimer = Dispatcher.CreateTimer(); pendingTimer.Interval = TimeSpan.FromSeconds(45);
 		pendingTimer.Tick += (_, _) => _ = CheckPending();
 		pendingTimer.Start();
 		Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(6), () => _ = CheckPending());
-
-		return Scroll(new VerticalStackLayout
-		{
-			Padding = new Thickness(20, 8, 20, 24),
-			Children = { Lbl("Sosyal", 26, true), socialMsg, socialGate, socialMain }
-		});
 	}
 
 	void StyleSegs()
@@ -108,8 +115,8 @@ public partial class MainPage
 		{
 			bool on = (i == 0) == (socialPane == "friends");
 			if (segs[i] == null) continue;
-			segs[i].BackgroundColor = on ? sel : Panel2;
-			((Label)segs[i].Content).TextColor = on ? Text : Muted;
+			segs[i].BackgroundColor = on ? accent : Panel2;
+			((Label)segs[i].Content).TextColor = on ? onAccent : Muted;
 		}
 	}
 
@@ -231,7 +238,7 @@ public partial class MainPage
 						{
 							Lbl("Bir kullanıcı adı seç", 17, true),
 							Lbl("Arkadaşların seni bu adla bulur. 3-20 karakter; küçük harf (a-z), rakam ve _ kullanılabilir.", 13, false, Muted),
-							Card(name, 6),
+							Boxed(name),
 							new HorizontalStackLayout { Spacing = 10, Children = { share, new Label { Text = "Durumumu arkadaşlarım görsün", TextColor = Muted, FontSize = 13, VerticalOptions = LayoutOptions.Center } } },
 							save
 						}
@@ -270,7 +277,7 @@ public partial class MainPage
 
 		if (incoming.Count > 0)
 		{
-			friendsList.Children.Add(Head($"GELEN İSTEKLER ({incoming.Count})"));
+			friendsList.Children.Add(Head($"Gelen istekler ({incoming.Count})"));
 			foreach (var f in incoming)
 			{
 				var ok = SmallBtn("Kabul et", true); var no = SmallBtn("Reddet", false);
@@ -283,7 +290,7 @@ public partial class MainPage
 			}
 		}
 
-		friendsList.Children.Add(Head($"ARKADAŞLAR ({friends.Count})"));
+		friendsList.Children.Add(Head($"Arkadaşlar ({friends.Count})"));
 		if (friends.Count == 0)
 			friendsList.Children.Add(Lbl("Henüz arkadaşın yok. Yukarıya bir kullanıcı adı yazıp ekleyebilirsin.", 13, false, Muted));
 		foreach (var f in friends)
@@ -310,7 +317,7 @@ public partial class MainPage
 
 		if (outgoing.Count > 0)
 		{
-			friendsList.Children.Add(Head("GÖNDERİLEN İSTEKLER"));
+			friendsList.Children.Add(Head("Gönderilen istekler"));
 			foreach (var f in outgoing)
 			{
 				var fid = f.UserId;
@@ -358,7 +365,7 @@ public partial class MainPage
 
 		if (invites.Count > 0)
 		{
-			roomsList.Children.Add(Head($"ODA DAVETLERİ ({invites.Count})"));
+			roomsList.Children.Add(Head($"Oda davetleri ({invites.Count})"));
 			foreach (var r in invites)
 			{
 				var rid = r.Id;
@@ -372,7 +379,7 @@ public partial class MainPage
 			}
 		}
 
-		roomsList.Children.Add(Head($"ODALARIM ({mine.Count})"));
+		roomsList.Children.Add(Head($"Odalarım ({mine.Count})"));
 		if (mine.Count == 0)
 			roomsList.Children.Add(Lbl("Henüz bir odan yok. Bir oda kur ya da arkadaşının davet kodunu gir.", 13, false, Muted));
 		foreach (var r in mine)
@@ -430,7 +437,7 @@ public partial class MainPage
 			var codeRow = new HorizontalStackLayout { Spacing = 10, Children = { Lbl("Davet kodu:", 13, false, Muted), code, copy, share } };
 			boardHead.Children.Add(Card(codeRow, 12));
 
-			boardHead.Children.Add(Head("SIRALAMA ARALIĞI"));
+			boardHead.Children.Add(Head("Sıralama aralığı"));
 			var chips = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
 			bool custom = BoardPeriods.All(p => p.days != boardDays);
 			foreach (var (days, label) in BoardPeriods)
@@ -445,7 +452,7 @@ public partial class MainPage
 			}));
 			boardHead.Children.Add(chips);
 			boardHead.Children.Add(Lbl($"Son {boardDays} gün (bugün dahil) · " + (b.IsOwner ? "Seçtiğin aralık odanın varsayılanı olarak kaydedilir." : "Bu seçim yalnızca senin ekranında geçerli."), 12, false, Muted));
-			boardHead.Children.Add(Head("LİDER TABLOSU"));
+			boardHead.Children.Add(Head("Lider tablosu"));
 		}
 
 		boardList.Children.Clear();
@@ -488,14 +495,14 @@ public partial class MainPage
 		var pending = b.Members.Where(m => m.Invited).ToList();
 		if (pending.Count > 0)
 		{
-			boardInvite.Children.Add(Head("DAVET EDİLENLER"));
+			boardInvite.Children.Add(Head("Davet edilenler"));
 			foreach (var m in pending) boardInvite.Children.Add(Card(Lbl($"@{m.Username} · yanıt bekleniyor", 14, false, Muted), 12));
 		}
 		var inRoom = b.Members.Select(m => m.UserId).ToHashSet();
 		var invitable = friends.Where(f => f.Rel == "friend" && !inRoom.Contains(f.UserId)).ToList();
 		if (invitable.Count > 0)
 		{
-			boardInvite.Children.Add(Head("ARKADAŞINI DAVET ET"));
+			boardInvite.Children.Add(Head("Arkadaşını davet et"));
 			var wrap = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
 			foreach (var f in invitable)
 			{
@@ -519,7 +526,7 @@ public partial class MainPage
 
 	Border SmallBtn(string text, bool filled)
 	{
-		var l = Lbl(text, 13, true, filled ? Color.FromArgb("#0A0E1A") : Text);
+		var l = Lbl(text, 13, true, filled ? onAccent : Text);
 		l.HorizontalTextAlignment = TextAlignment.Center; l.VerticalTextAlignment = TextAlignment.Center;
 		return new Border
 		{
@@ -532,9 +539,9 @@ public partial class MainPage
 	{
 		var b = new Border
 		{
-			BackgroundColor = on ? sel : Panel2, StrokeThickness = 0, Padding = new Thickness(14, 0), HeightRequest = 36,
+			BackgroundColor = on ? accent : Panel2, StrokeThickness = 0, Padding = new Thickness(14, 0), HeightRequest = 36,
 			Margin = new Thickness(0, 0, 8, 8), StrokeShape = new RoundRectangle { CornerRadius = 18 },
-			Content = new Label { Text = text, TextColor = on ? Text : Muted, FontSize = 13, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center }
+			Content = new Label { Text = text, TextColor = on ? onAccent : Muted, FontSize = 13, FontFamily = F8, VerticalOptions = LayoutOptions.Center }
 		};
 		Tap(b, click);
 		return b;
@@ -570,15 +577,21 @@ public partial class MainPage
 public partial class MainPage
 {
 	IDispatcherTimer? pendingTimer;
-	readonly Label badgeLabel = new() { TextColor = Colors.White, FontSize = 10, FontAttributes = FontAttributes.Bold, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center };
+	Label badgeLabel = new() { TextColor = Colors.White, FontSize = 10, FontFamily = F8, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center };
 	Border? badgeBorder;
 
-	Border socialBadge => badgeBorder ??= new Border
+	Border socialBadge => badgeBorder ??= NewBadge();
+
+	Border NewBadge()
+	{
+		badgeLabel = new Label { TextColor = Colors.White, FontSize = 10, FontFamily = F8, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center };
+		return new Border
 	{
 		BackgroundColor = Color.FromArgb("#E5484D"), StrokeThickness = 0, MinimumWidthRequest = 16, HeightRequest = 16, Padding = new Thickness(4, 0),
 		StrokeShape = new RoundRectangle { CornerRadius = 8 }, HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Start,
 		Margin = new Thickness(0, 3, 4, 0), IsVisible = false, InputTransparent = true, Content = badgeLabel
 	};
+	}
 
 	async Task CheckPending()
 	{

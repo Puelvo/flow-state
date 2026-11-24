@@ -974,30 +974,9 @@ public partial class MainWindow
     static ImageBrush GrassBrush()
     {
         if (grassBrush != null) return grassBrush;
-        const int N = 64;
-        var px = new uint[N * N];
-        Array.Fill(px, 0xFF8DC963u);
-        var rnd = new Random(11);
-        for (int i = 0; i < 170; i++)                                // çim tutamları: 1×2 açık ya da koyu
-        {
-            int x = rnd.Next(N), y = rnd.Next(N);
-            uint c = rnd.Next(3) == 0 ? 0xFF7BB853u : 0xFFA3D77Au;
-            px[y * N + x] = c;
-            px[(y + 1) % N * N + x] = c;
-        }
-        uint[] petals = { 0xFFFFFFFFu, 0xFFFFB8CBu, 0xFFFFE27Au };
-        for (int i = 0; i < 7; i++)                                  // minik çiçekler: artı biçimli taç, sarı göbek
-        {
-            int x = rnd.Next(N), y = rnd.Next(N);
-            uint c = petals[i % petals.Length];
-            px[y * N + (x + 1) % N] = c;
-            px[y * N + (x + N - 1) % N] = c;
-            px[(y + 1) % N * N + x] = c;
-            px[(y + N - 1) % N * N + x] = c;
-            px[y * N + x] = c == 0xFFFFE27Au ? 0xFFFFFFFFu : 0xFFF5B731u;
-        }
-        var bmp = BitmapSource.Create(N, N, 96, 96, PixelFormats.Bgra32, null, px, N * 4);
-        bmp.Freeze();
+        var tile = PixelArt.GrassTile();
+        int N = tile.W;
+        var bmp = B(tile);
         grassBrush = new ImageBrush(bmp)
         {
             TileMode = TileMode.Tile, ViewportUnits = BrushMappingMode.Absolute, Viewport = new Rect(0, 0, N * PixelScale, N * PixelScale), Stretch = Stretch.Fill

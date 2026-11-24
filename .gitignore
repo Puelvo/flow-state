@@ -10,3 +10,7 @@ Mobile/obj/
 data*.json
 sync.json
 *.tmp
+# İmza anahtarları (asla depoya girmez)
+*.keystore
+*.jks
+*.pfx

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFrameworks>net10.0-android</TargetFrameworks>
@@ -52,7 +52,11 @@
 		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
 		
 		<!-- Custom Fonts -->
-		<MauiFont Include="Resources\Fonts\*" />
+		<MauiFont Include="..\Assets\fonts\*.ttf" />
+
+		<!-- Piksel sprite'lar (masaüstüyle ortak): assets/pixel -->
+		<MauiAsset Include="..\Assets\pixellab\*.png" LogicalName="pixel/%(Filename)%(Extension)" />
+		<MauiAsset Include="..\Assets\explorer\explorer_walk.png" LogicalName="pixel/explorer_walk.png" />
 
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
@@ -64,6 +68,14 @@
 		<Compile Include="..\SocialService.cs" Link="SocialService.cs" />
 		<Compile Include="..\StatsMath.cs" Link="StatsMath.cs" />
 		<Compile Include="..\Zoo.cs" Link="Zoo.cs" />
+		<Compile Include="..\ZooWander.cs" Link="ZooWander.cs" />
+		<Compile Include="..\DayCycle.cs" Link="DayCycle.cs" />
+		<Compile Include="..\ThemeTable.cs" Link="ThemeTable.cs" />
+		<Compile Include="..\PixelArt.cs" Link="PixelArt.cs" />
+		<Compile Include="..\PixelArt.Sky.cs" Link="PixelArt.Sky.cs" />
+		<Compile Include="..\PixelArt.Icons.cs" Link="PixelArt.Icons.cs" />
+		<Compile Include="..\PixelScene.cs" Link="PixelScene.cs" />
+		<Compile Include="..\WidgetScene.cs" Link="WidgetScene.cs" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 	</ItemGroup>

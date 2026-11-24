@@ -13,17 +13,8 @@ public partial class MainWindow
 {
     const int MaxName = 16;
 
-    static readonly Dictionary<string, string> DefaultNames = new()
-    { ["zebra"] = "Çizgi", ["giraffe"] = "Zuzu", ["rhino"] = "Boncuk", ["elephant"] = "Fındık", ["lion"] = "Paşa" };
-
     /// <param name="key">Bahçedeki kimlik: "zebra" ya da nadir dostta "golden:zebra", "baby:lion".</param>
-    string NameOf(string key)
-    {
-        if (data.AnimalNames.TryGetValue(key, out var n) && n.Length > 0) return n;
-        if (key.StartsWith("baby:")) return "Minik " + NameOf(key[5..]);
-        if (key.StartsWith("golden:")) return "Altın " + NameOf(key[7..]);
-        return DefaultNames.GetValueOrDefault(key) ?? ZooCatalog.Find(key)?.Name ?? key;
-    }
+    string NameOf(string key) => ThemeTable.NameOf(data, key);
 
     void RenameAnimal(string key)
     {
