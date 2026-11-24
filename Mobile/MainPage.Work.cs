@@ -2,7 +2,7 @@ using Microsoft.Maui.Controls.Shapes;
 
 namespace FlowState.Mobile;
 
-// Çalış: canlı piksel bahçe (SceneView) tam ekran; üstte dersler, jeton ve market, altta mod seçici ve düğmeler.
+// Çalış: canlı piksel bahçe (SceneView) tam ekran; üstte dersler, jeton ve market, güneşin yanında mod seçici, altta yalnızca düğmeler.
 // Güneşe dokununca başlar/duraklar; hayvanlara dokunulur, çift dokununca adı değişir, basılı sürükleyince taşınır.
 public partial class MainPage
 {
@@ -44,15 +44,15 @@ public partial class MainPage
 		head.Add(logo, 0, 0); head.Add(coinPill, 1, 0); head.Add(market, 2, 0);
 		topBox = new VerticalStackLayout { Spacing = 10, VerticalOptions = LayoutOptions.Start, Padding = new Thickness(0, 12, 0, 0), Children = { head, chipScroll } };
 
-		// Alt: yıldızlar, mod, düğmeler (sekmelerin üstünde)
+		// Mod seçici gökyüzünde, güneşin sağındaki boşlukta (bahçeyi kapatmaz); altta yalnızca düğmeler
 		pips = new HorizontalStackLayout { Spacing = 5, HorizontalOptions = LayoutOptions.Center };
 		pipsPill = new Border { BackgroundColor = T("Glass"), StrokeThickness = 0, Padding = new Thickness(10, 5), StrokeShape = new RoundRectangle { CornerRadius = 14 }, HorizontalOptions = LayoutOptions.Center, Content = pips, InputTransparent = true };
-		modeHost = new Grid { HorizontalOptions = LayoutOptions.Center };
+		modeHost = new Grid { HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Start, WidthRequest = 60, Margin = new Thickness(0, 112, 6, 0) };
 		startHost = new Grid(); stopHost = new Grid();
 		var btns = new HorizontalStackLayout { Spacing = 16, HorizontalOptions = LayoutOptions.Center, Children = { startHost, stopHost } };
-		bottomBox = new VerticalStackLayout { Spacing = 10, VerticalOptions = LayoutOptions.End, HorizontalOptions = LayoutOptions.Center, Padding = new Thickness(0, 0, 0, 82), Children = { modeHost, btns } };
+		bottomBox = new VerticalStackLayout { Spacing = 10, VerticalOptions = LayoutOptions.End, HorizontalOptions = LayoutOptions.Center, Padding = new Thickness(0, 0, 0, 76), Children = { btns } };
 
-		var ui = new Grid { InputTransparent = true, CascadeInputTransparent = false, Children = { topBox, pipsPill, bottomBox } };
+		var ui = new Grid { InputTransparent = true, CascadeInputTransparent = false, Children = { topBox, pipsPill, modeHost, bottomBox } };
 		topBox.InputTransparent = bottomBox.InputTransparent = true;
 		topBox.CascadeInputTransparent = bottomBox.CascadeInputTransparent = false;
 		head.InputTransparent = btns.InputTransparent = logo.InputTransparent = true;
@@ -74,14 +74,15 @@ public partial class MainPage
 		if (horizon < sunY + r) sunY = horizon - r - 2;
 		if (bottomBox.Height > 0)
 		{
-			int bw = (int)(Math.Max(modeHost.Width, 200) * dp), top = h - (int)(bottomBox.Height * dp);
+			int bw = (int)(Math.Max(bottomBox.Width, 80) * dp), top = h - (int)(bottomBox.Height * dp);
 			scene.SetAvoid(w / 2 - bw / 2, top, w / 2 + bw / 2);
 		}
 		pipsTop = (sunY + r + 4) / dp;
+		modeTop = (sunY - r) / dp + 2;
 		return (horizon, w / 2, sunY);
 	}
 
-	double pipsTop;
+	double pipsTop, modeTop;
 	string sceneTone = "";
 	DateTime paletteAt = DateTime.MinValue;
 
@@ -107,6 +108,7 @@ public partial class MainPage
 		sceneView.Time = $"{s / 3600:00}:{s % 3600 / 60:00}:{s % 60:00}";
 		sceneView.TimeAlpha = !Active ? 0.4f : Running ? 1f : 0.6f;
 		if (pipsPill.IsVisible && Math.Abs(pipsPill.Margin.Top - pipsTop) > 1) Dispatcher.Dispatch(() => pipsPill.Margin = new Thickness(0, pipsTop, 0, 0));
+		if (modeHost.IsVisible && Math.Abs(modeHost.Margin.Top - modeTop) > 1) Dispatcher.Dispatch(() => modeHost.Margin = new Thickness(0, modeTop, 6, 0));
 	}
 
 	Course? CurrentCourse
@@ -180,24 +182,49 @@ public partial class MainPage
 		workKey = key;
 
 		startHost.Children.Clear();
-		startHost.Children.Add(PixButton(Active && Running ? "pause" : "play", accent, onAccent, 88, 72, ToggleTimer, course != null ? 1 : 0.35));
+		startHost.Children.Add(PixButton(Active && Running ? "pause" : "play", accent, onAccent, 76, 60, ToggleTimer, course != null ? 1 : 0.35));
 		stopHost.Children.Clear();
 		stopHost.IsVisible = Active;
-		stopHost.Children.Add(PixButton("stop", DangerSoft, Danger, 72, 72, Commit, 1));
+		stopHost.Children.Add(PixButton("stop", DangerSoft, Danger, 60, 60, Commit, 1));
 
 		modeHost.Children.Clear();
 		modeHost.IsVisible = !Active;
-		modeHost.Children.Add(Seg(new (string, string, string?)[] { ("up", "Kronometre", "timer"), ("down", data.Countdown ? $"Geri sayım · {data.CountdownMinutes} dk" : "Geri sayım", "hourglass") }, data.Countdown ? "down" : "up", k =>
-		{
-			data.Countdown = k == "down"; Store.Save(data); RefreshTimer();
-			if (data.Countdown) OpenDial();
-		}));
+		modeHost.Children.Add(ModePill());
 
 		pips.Children.Clear();
 		for (int i = 0; i < Math.Min(laps, 10); i++) pips.Children.Add(Ico("star", T("Coin"), 18));
 		if (laps > 10) pips.Children.Add(Lbl($"+{laps - 10}", 13, true, Text));
 		if (laps >= 0) pips.Children.Add(Ico("staro", accent, 18));
 		pipsPill.IsVisible = laps >= 0;
+	}
+
+	/// <summary>Dikey küçük hap: kronometre / geri sayım. Geri sayıma dokununca süre kadranı açılır.</summary>
+	View ModePill()
+	{
+		View Item(string icon, string label, bool on, Action pick)
+		{
+			var fg = on ? onAccent : Muted;
+			var b = new Border
+			{
+				BackgroundColor = on ? accent : Colors.Transparent, StrokeThickness = 0, HeightRequest = 46, Padding = 0, StrokeShape = new RoundRectangle { CornerRadius = 15 },
+				Content = new VerticalStackLayout { Spacing = 1, VerticalOptions = LayoutOptions.Center, InputTransparent = true, Children = { Ico(icon, fg, 20), new Label { Text = label, FontSize = 9, FontFamily = F8, TextColor = fg, HorizontalTextAlignment = TextAlignment.Center, LineBreakMode = LineBreakMode.NoWrap } } }
+			};
+			SemanticProperties.SetDescription(b, label);
+			Tap(b, () => { Buzz(); pick(); });
+			return b;
+		}
+		return new Border
+		{
+			BackgroundColor = T("Glass"), StrokeThickness = 0, Padding = 3, StrokeShape = new RoundRectangle { CornerRadius = 18 },
+			Content = new VerticalStackLayout
+			{
+				Spacing = 2, Children =
+				{
+					Item("timer", "Kronometre", !data.Countdown, () => { data.Countdown = false; Store.Save(data); RefreshTimer(); }),
+					Item("hourglass", data.Countdown ? $"{data.CountdownMinutes} dk" : "Geri sayım", data.Countdown, () => { data.Countdown = true; Store.Save(data); RefreshTimer(); OpenDial(); })
+				}
+			}
+		};
 	}
 
 	/// <summary>Piksel şeker düğme (başlat, bitir).</summary>

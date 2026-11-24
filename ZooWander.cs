@@ -208,7 +208,9 @@ public sealed class ZooWorld
     {
         var k = Keeper;
         if (double.IsNaN(k.X) || Width <= 0) return;
+        if (Riding && !JeepInside) { celebrateWaiting = true; return; }      // jeep ekranın dışında: önce geri girsin
         if (Riding) StepOut();
+        celebrateWaiting = false;
         visiting = null;
         k.State = WanderState.Idle; k.Timer = CelebrateSeconds; k.HopT = 0; k.HappyTimer = 2.5;
         Celebrating = CelebrateSeconds;
@@ -227,7 +229,7 @@ public sealed class ZooWorld
         {
             // Oturum başladı: (kutlama sürüyorsa biter) gezgin jeep'ine koşar ve biner.
             if (Celebrating > 0) { Celebrating = 0; foreach (var w in Animals) w.Welcoming = false; }
-            visiting = null;
+            visiting = null; celebrateWaiting = false;
             if (fresh) Riding = true;                              // uygulama süren oturumla açıldı
             if (!Riding)
             {
@@ -237,7 +239,12 @@ public sealed class ZooWorld
             if (Riding) { k.X = JeepX; k.Y = JeepY; k.FacingRight = JeepRight; }
             return;
         }
-        if (Riding) StepOut();
+        if (Riding)
+        {
+            if (!JeepInside) { k.X = JeepX; k.Y = JeepY; return; }       // ekranın dışındaysa girene kadar sürer
+            StepOut();
+            if (celebrateWaiting) Celebrate();
+        }
 
         if (Celebrating > 0)
         {
@@ -310,7 +317,10 @@ public sealed class ZooWorld
     public double JeepX = double.NaN, JeepY, JeepV, JeepRoll;   // konum (tekerleklerin bastığı nokta), hız, gidilen yol
     public bool JeepRight = true;
     public const double JeepSpeed = 64;
-    double jeepPause, jeepBlocked;
+    double jeepBlocked;
+    bool celebrateWaiting;                 // kutlama, jeep ekrana girince başlayacak
+    const double JeepOut = 130;            // ekran kenarından bu kadar ötede tamamen görünmez
+    bool JeepInside => JeepX >= JeepMin && JeepX <= JeepMax;
     double JeepMin => Math.Min(110, Width / 2);
     double JeepMax => Math.Max(JeepMin, Width - 110);
 
@@ -326,18 +336,14 @@ public sealed class ZooWorld
     {
         if (PathY == null) return;
         if (double.IsNaN(JeepX)) JeepX = Width * 0.3;
-        double target = 0;
-        if (Riding && KeeperWalking)
-        {
-            if (jeepPause > 0) jeepPause -= dt;
-            else if (JeepRight ? JeepX >= JeepMax - 1 : JeepX <= JeepMin + 1)
-            {
-                if (JeepV < 5) { JeepRight = !JeepRight; jeepPause = 0.6; }           // yolun sonu: döner
-            }
-            else if (!Blocked(dt)) target = Math.Min(JeepSpeed, Math.Max(12, (JeepRight ? JeepMax - JeepX : JeepX - JeepMin) * 0.9));
-        }
-        JeepV += Math.Clamp(target - JeepV, -150 * dt, 55 * dt);
-        JeepX = Math.Clamp(JeepX + (JeepRight ? 1 : -1) * JeepV * dt, JeepMin, JeepMax);
+        JeepRight = true;
+        // Sağdan çıkar, soldan yeniden girer. Mola ya da bitişte ekranın dışındaysa hızlanıp girene kadar sürer, sonra durur.
+        bool go = Riding && SessionOn && KeeperWalking, returning = Riding && !go && !JeepInside;
+        double target = returning ? JeepSpeed * 2.5 : go && !Blocked(dt) ? JeepSpeed : 0;
+        JeepV += Math.Clamp(target - JeepV, -150 * dt, (returning ? 220 : 55) * dt);
+        JeepX += JeepV * dt;
+        if (JeepX > Width + JeepOut) JeepX = -JeepOut;
+        if (!Riding) JeepX = Math.Clamp(JeepX, JeepMin, JeepMax);
         JeepRoll += JeepV * dt;
         JeepY = Math.Clamp(PathY(JeepX), MinY, MaxY);
     }
