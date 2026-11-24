@@ -210,27 +210,19 @@
                 </StackPanel>
 
                 <!--
-                    Güneş saat: gökyüzündeki güneş (gece ay). Çevresindeki ışık halkası (RingArc) ilerlemeyi, içindeki yazı süreyi gösterir.
-                    Renkleri gün döngüsünden gelir (ApplySunPalette).
+                    Güneş saat: gökyüzündeki piksel güneş (gece ay). Çevresindeki 60 ışın (RingRays) ilerlemeyi, içindeki yazı süreyi gösterir.
+                    Renkleri gün döngüsünden gelir (ApplySunPalette); çizimi MainWindow.SunDial.cs.
                 -->
                 <Grid x:Name="RingHost" Grid.Row="1" Width="320" Height="320" Margin="0,6,0,0" HorizontalAlignment="Center"
                       Background="Transparent" Cursor="Hand" ToolTip="Başlat / duraklat"
                       PreviewMouseLeftButtonDown="Ring_Down" MouseMove="Ring_Move" MouseLeftButtonUp="Ring_Up">
                     <Ellipse x:Name="SunGlow" Margin="-34" IsHitTestVisible="False"/>
-                    <Grid Width="300" Height="300">
-                        <Ellipse x:Name="SunTrack" Width="300" Height="300" Stroke="#55FFFFFF" StrokeThickness="20"/>
-                        <Canvas x:Name="RingArc" Width="300" Height="300" Visibility="Collapsed"/>
-                    </Grid>
-                    <Ellipse x:Name="RingFace" Width="244" Height="244" StrokeThickness="3" StrokeDashArray="0.01 2.6"
-                             StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
-                        <Ellipse.RenderTransform><ScaleTransform x:Name="RingFaceScale"/></Ellipse.RenderTransform>
-                    </Ellipse>
-                    <!-- Ay (gece): gerçek dolunay haritasına göre denizler (maria) ve kraterler; BuildMoon çizer.
-                         Saydamlığı vaktin "ay" oranıdır. -->
-                    <Grid x:Name="MoonDeco" Width="244" Height="244" IsHitTestVisible="False" Opacity="0"
-                          RenderTransformOrigin="0.5,0.5" RenderTransform="{Binding RenderTransform, ElementName=RingFace}">
-                        <Grid.Clip><EllipseGeometry Center="122,122" RadiusX="122" RadiusY="122"/></Grid.Clip>
-                    </Grid>
+                    <Image x:Name="RingRays" Width="318" Height="318" Stretch="Fill" IsHitTestVisible="False"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <Image x:Name="RingFace" Width="318" Height="318" Stretch="Fill" IsHitTestVisible="False"
+                           RenderOptions.BitmapScalingMode="HighQuality" RenderTransformOrigin="0.5,0.5">
+                        <Image.RenderTransform><ScaleTransform x:Name="RingFaceScale"/></Image.RenderTransform>
+                    </Image>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="200">
                         <TextBlock x:Name="TimerCourseName" Text="Bir ders seç" FontSize="20" FontWeight="Black"
                                    Foreground="{StaticResource Text}"

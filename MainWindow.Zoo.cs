@@ -434,7 +434,44 @@ public partial class MainWindow
         var hop = new TranslateTransform();
         var img = new Image { Width = S, Height = S, Source = poses[0], Cursor = Cursors.Hand, RenderTransform = new TransformGroup { Children = { flip, hop } } };
         RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.NearestNeighbor);
-        img.MouseLeftButtonDown += (_, e) => { zooWorld.Poke(w); e.Handled = true; };
+        // Tıklama: zıplar. Basılı tutup sürükleme: hayvanı taşır, bırakınca oraya konar.
+        Point? press = null;
+        Vector grab = default;
+        void Release()
+        {
+            press = null;
+            img.Cursor = Cursors.Hand;
+            zooWorld.Drop(w);                                        // taşınmıyorsa etkisizdir
+        }
+        img.MouseLeftButtonDown += (_, e) =>
+        {
+            press = e.GetPosition(canvas);
+            img.CaptureMouse();
+            e.Handled = true;
+        };
+        img.MouseMove += (_, e) =>
+        {
+            if (press is not Point p0 || e.LeftButton != MouseButtonState.Pressed) return;
+            var p = e.GetPosition(canvas);
+            if (!w.Held)
+            {
+                if ((p - p0).Length < 5) return;                     // titreme tıklamayı bozmasın
+                grab = new Vector(w.X - p0.X, w.Y - p0.Y);           // tutulan nokta imlecin altında kalsın
+                zooWorld.Grab(w);
+                img.Cursor = Cursors.SizeAll;
+            }
+            zooWorld.DragTo(w, p.X + grab.X, p.Y + grab.Y);
+        };
+        img.MouseLeftButtonUp += (_, e) =>
+        {
+            if (press == null) return;
+            bool wasDrag = w.Held;
+            Release();
+            img.ReleaseMouseCapture();
+            if (!wasDrag) zooWorld.Poke(w);
+            e.Handled = true;
+        };
+        img.LostMouseCapture += (_, _) => { if (press != null) Release(); };   // pencere odağı giderse hayvan havada kalmasın
 
         // İsim etiketi: beyaz hap, kakao yazı, altında küçük üçgen kuyruk ve sahte (ucuz) gölge.
         var text = new TextBlock { FontSize = 12, FontWeight = FontWeights.ExtraBold, Foreground = Res("Text"), VerticalAlignment = VerticalAlignment.Center };
@@ -505,6 +542,7 @@ public partial class MainWindow
         zooWorld.Update(dt);
         TickKeeper();
         TickAmbient(dt);
+        TickClouds(dt);
 
         const double S = ZooWorld.Sprite;
         foreach (var n in zooNodes)
@@ -514,7 +552,7 @@ public partial class MainWindow
             n.Root.Visibility = Visibility.Visible;
             Canvas.SetLeft(n.Root, Math.Round(w.X - S / 2));
             Canvas.SetTop(n.Root, Math.Round(w.Y - S));
-            Panel.SetZIndex(n.Root, (int)w.Y);                       // aşağıdaki öndedir
+            Panel.SetZIndex(n.Root, w.Held ? 200000 : (int)w.Y);     // aşağıdaki öndedir; taşınan en öndedir
             n.Flip.ScaleX = w.FacingRight ? 1 : -1;                  // kareler sağa bakar
             n.Hop.Y = Math.Round(w.HopOffset);
 
@@ -527,7 +565,7 @@ public partial class MainWindow
 
             // Etiket: yeni gelen "Yeni!" (tema renginde), selamlaşırken kalp, tıklanınca adı, uyurken "z z".
             const string HeartLabel = "♥";
-            string? label = w.Arriving ? "Yeni!" : w.State == WanderState.Greet ? HeartLabel : w.NameTimer > 0 ? n.Name
+            string? label = w.Arriving ? "Yeni!" : w.State == WanderState.Greet ? HeartLabel : w.Held || w.NameTimer > 0 ? n.Name
                 : w.State == WanderState.Idle && w.Shown == ZooPose.Sleep ? "z z" : null;
             if (label == null) { n.Bubble.Visibility = Visibility.Collapsed; continue; }
             if ((string?)n.Bubble.Tag != label)

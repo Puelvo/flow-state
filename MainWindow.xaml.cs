@@ -446,82 +446,6 @@ public partial class MainWindow : Window
         return true;
     }
 
-    // Çember: her saat bir tam tur. İlerleme = saatin kaçta kaçı geçti.
-    void UpdateRing()
-    {
-        double t = active ? sw.Elapsed.TotalSeconds : 0;
-        double frac = countdownTarget > 0 ? Math.Min(t / countdownTarget, 1) : t % 3600 / 3600;
-        if (frac < 0.002) { RingArc.Visibility = Visibility.Collapsed; ringShown = 0; return; }
-        frac = Math.Min(frac, 0.9999);
-        EnsureRingSegments();
-
-        // 1°'lik küçük çizgilerden oluşan geçişli yay: görünen parça sayısı ilerlemeye göre değişir.
-        double deg = frac * 360;
-        int m = (int)Math.Ceiling(deg);
-        for (int i = Math.Max(0, Math.Min(ringShown, m) - 2); i < Math.Max(ringShown, m); i++)
-        {
-            bool vis = i < m;
-            ringSegs[i].Visibility = vis ? Visibility.Visible : Visibility.Collapsed;
-            if (vis) SetSeg(ringSegs[i], i, i == m - 1 ? deg : i + 1.6);
-        }
-        ringShown = m;
-
-        // Yuvarlak uçlar: başlangıç ve güncel uç kendi geçiş renklerini alır.
-        var acc = RingColor();
-        ringCapStart!.Fill = new SolidColorBrush(GradAt(acc, 0));
-        ringCapEnd!.Fill = new SolidColorBrush(GradAt(acc, frac));
-        var (ex, ey) = RingPoint(deg);
-        Canvas.SetLeft(ringCapEnd, ex - 10); Canvas.SetTop(ringCapEnd, ey - 10);
-        RingArc.Visibility = Visibility.Visible;
-    }
-
-    readonly System.Windows.Shapes.Line[] ringSegs = new System.Windows.Shapes.Line[360];
-    System.Windows.Shapes.Ellipse? ringCapStart, ringCapEnd;
-    Color ringBuiltFor;
-    int ringShown;
-
-    static (double x, double y) RingPoint(double deg)
-    {
-        double a = deg * Math.PI / 180;
-        return (150 + 140 * Math.Sin(a), 150 - 140 * Math.Cos(a));
-    }
-
-    static void SetSeg(System.Windows.Shapes.Line l, double fromDeg, double toDeg)
-    {
-        (l.X1, l.Y1) = RingPoint(fromDeg);
-        (l.X2, l.Y2) = RingPoint(toDeg);
-    }
-
-    static Color GradAt(Color acc, double t)
-    {
-        var (r, g, b) = RingGradient.At(acc.R, acc.G, acc.B, t);
-        return Color.FromRgb(r, g, b);
-    }
-
-    // Tema rengi değişince çizgilerin renkleri yeniden verilir.
-    void EnsureRingSegments()
-    {
-        var acc = RingColor();
-        if (ringCapStart != null && ringBuiltFor == acc) return;
-        ringBuiltFor = acc;
-        if (ringCapStart == null)
-        {
-            for (int i = 0; i < 360; i++)
-            {
-                ringSegs[i] = new System.Windows.Shapes.Line { StrokeThickness = 20, StrokeStartLineCap = PenLineCap.Flat, StrokeEndLineCap = PenLineCap.Flat, Visibility = Visibility.Collapsed };
-                RingArc.Children.Add(ringSegs[i]);
-            }
-            ringCapStart = new System.Windows.Shapes.Ellipse { Width = 20, Height = 20 };
-            ringCapEnd = new System.Windows.Shapes.Ellipse { Width = 20, Height = 20 };
-            var (sx, sy) = RingPoint(0);
-            Canvas.SetLeft(ringCapStart, sx - 10); Canvas.SetTop(ringCapStart, sy - 10);
-            RingArc.Children.Add(ringCapStart);
-            RingArc.Children.Add(ringCapEnd);
-        }
-        for (int i = 0; i < 360; i++)
-            ringSegs[i].Stroke = new SolidColorBrush(GradAt(acc, (i + 0.8) / 360.0));
-    }
-
     int pipsShown = int.MinValue;
 
     void UpdatePips()
@@ -716,14 +640,6 @@ public partial class MainWindow : Window
         UpdateStatusPill(course);
         UpdateRingFace(course);
         SetBreathing(active && sw.IsRunning);
-
-        // Çember ve başlat butonu ayarlardaki tema rengini alır (StartBtn: DynamicResource Accent).
-        // Widget'ta parıltı yok: sakin, sabit görünüm. Açık zeminde hafif, renkli bir hale yeter.
-        var tc = RingColor();
-        if (widgetMode) RingArc.Effect = null;
-        else if (RingArc.Effect is not System.Windows.Media.Effects.DropShadowEffect glow || glow.Color != tc)
-            RingArc.Effect = new System.Windows.Media.Effects.DropShadowEffect
-            { Color = tc, BlurRadius = 14, ShadowDepth = 2, Direction = 270, Opacity = 0.35 };
 
         int es = ActiveSeconds;
         ElapsedText.Text = countdownTarget > 0 ? Clock(Math.Max(0, countdownTarget - es))

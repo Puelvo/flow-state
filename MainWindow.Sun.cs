@@ -31,7 +31,7 @@ public partial class MainWindow
 
     static Color C(uint argb) => Color.FromArgb((byte)(argb >> 24), (byte)(argb >> 16), (byte)(argb >> 8), (byte)argb);
 
-    /// <summary>Güneş saatin ilerleme halkasının rengi (vaktin ışığı).</summary>
+    /// <summary>Güneş saatin ışınlarının rengi (vaktin ışığı).</summary>
     Color RingColor() => C(sunPalette.Ray);
 
     // ---------- kurulum ----------
@@ -86,7 +86,6 @@ public partial class MainWindow
         PipsBar.SizeChanged += (_, _) => LayoutScene();
         BottomRow.SizeChanged += (_, _) => LayoutScene();
         TopRow.SizeChanged += (_, _) => LayoutScene();
-        BuildMoon();
         ApplySunPalette(force: true);
         EnsureZooTimer();
     }
@@ -100,12 +99,12 @@ public partial class MainWindow
         double bottom = RingHost.TranslatePoint(new Point(0, RingHost.ActualHeight), SunScene).Y;
         double horizon = Math.Clamp(bottom + 4, h * 0.42, h - 190);
         UpdateAvoid(horizon);
-        if (Math.Abs(horizon - horizonY) < 1 && hillsImg!.Width >= w) return;
+        if (Math.Abs(horizon - horizonY) < 1 && hillsImg!.Width >= w) { TickClouds(0); return; }
         horizonY = horizon;
 
         skyRect.Height = horizon + 4;
         starLayer!.Height = horizon;
-        cloudLayer!.Margin = new Thickness(0, 10, 0, 0);
+        TickClouds(0);
         UpdateHills(w);
         hillsImg!.Margin = new Thickness(0, horizon - 41 * PixelScale, 0, 0);
         grassLayer!.Margin = new Thickness(0, horizon - 9, 0, 0);
@@ -204,19 +203,14 @@ public partial class MainWindow
             if (lightChanged && SunScene.ActualWidth > 0) { hillsFor = ""; UpdateHills(SunScene.ActualWidth); }
         }
 
-        // Güneş saat: disk (güneş ya da ay), hâle, iz halkası ve ilerleme halkası.
-        RingFace.Fill = new RadialGradientBrush(C(p.DiscA), C(p.DiscB)) { GradientOrigin = new Point(0.42, 0.36), Center = new Point(0.45, 0.42), RadiusX = 0.62, RadiusY = 0.62 };
-        // Güneşin noktalı süs halkası gece kaybolur (ay sade kalsın).
-        RingFace.Stroke = new SolidColorBrush(Color.FromArgb((byte)(0xC0 * Math.Clamp(1 - p.Moon, 0, 1)), C(p.Ray).R, C(p.Ray).G, C(p.Ray).B));
+        // Güneş saat: disk (güneş ya da ay), hâle ve ışınlar.
+        UpdateDisc();
         var glow = C(p.Glow);
         SunGlow.Fill = new RadialGradientBrush(
             new GradientStopCollection { new(glow, 0.55), new(Color.FromArgb((byte)(glow.A / 3), glow.R, glow.G, glow.B), 0.78), new(Color.FromArgb(0, glow.R, glow.G, glow.B), 1) });
-        SunTrack.Stroke = new SolidColorBrush(Color.FromArgb(0x60, 0xFF, 0xFF, 0xFF));
         // Gece canlıları palet değişince hemen güncellensin (saniyelik tike beklemeden).
         if (owlImg != null) owlImg.Visibility = p.Moon >= 0.5 ? Visibility.Visible : Visibility.Collapsed;
         if (campGlow != null) campGlow.Opacity = 0.25 + 0.75 * Math.Clamp(p.Moon, 0, 1);
-        // Ay süsü: gece tam, şafak/gün batımı geçişinde yarı saydam, gündüz yok.
-        MoonDeco.Opacity = Math.Clamp((p.Moon - 0.15) / 0.7, 0, 1);
         if (widgetMode) ApplyWidgetBackground();
         UpdateRing();
     }
@@ -309,25 +303,6 @@ public partial class MainWindow
                 Canvas.SetTop(s, Math.Round(fy * e.NewSize.Height / 3) * 3);
             }
         };
-        return layer;
-    }
-
-    /// <summary>Gökyüzünde yavaşça süzülen piksel bulutlar.</summary>
-    Canvas SkyClouds()
-    {
-        var layer = new Canvas { IsHitTestVisible = false, ClipToBounds = false, VerticalAlignment = VerticalAlignment.Top };
-        var list = new (int Kind, double Top, double Seconds, double Phase)[] { (0, 30, 170, 0.1), (1, 90, 210, 0.45), (2, 54, 250, 0.8), (0, 140, 230, 0.62) };
-        foreach (var c in list)
-        {
-            var bmp = CloudBitmap(c.Kind);
-            var img = new Image { Source = bmp, Width = bmp.PixelWidth * PixelScale, Height = bmp.PixelHeight * PixelScale };
-            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.NearestNeighbor);
-            Canvas.SetTop(img, c.Top);
-            layer.Children.Add(img);
-            var drift = new DoubleAnimation(-img.Width, 2400, TimeSpan.FromSeconds(c.Seconds * 2))
-            { RepeatBehavior = RepeatBehavior.Forever, BeginTime = TimeSpan.FromSeconds(-c.Seconds * 2 * c.Phase) };
-            img.BeginAnimation(Canvas.LeftProperty, drift);
-        }
         return layer;
     }
 
