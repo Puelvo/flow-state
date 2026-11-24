@@ -49,10 +49,6 @@ public partial class ConfirmDialog : Window
     }
 
     /// <summary>Onay sorusu. Kullanıcı onaylarsa true döner.</summary>
-    /// <summary>Ekran görüntüsü modu için: diyaloğu açmadan oluşturur.</summary>
-    internal static ConfirmDialog Preview(Window owner, string title, string message, string okText, bool danger)
-        => new(title, message, okText, "Vazgeç", danger) { Owner = owner };
-
     public static bool Ask(Window owner, string title, string message, string okText = "Sil", bool danger = true)
     {
         var d = new ConfirmDialog(title, message, okText, "Vazgeç", danger) { Owner = owner };

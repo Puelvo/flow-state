@@ -147,12 +147,8 @@ public static class Store
         }
     }
 
-    /// <summary>true iken Save hiçbir şey yazmaz (ekran görüntüsü modu örnek veriyi diske dökmesin).</summary>
-    public static bool ReadOnly { get; set; }
-
     public static void Save(AppData data)
     {
-        if (ReadOnly) return;
         try
         {
             Directory.CreateDirectory(Dir);
