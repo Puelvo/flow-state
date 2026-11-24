@@ -94,7 +94,7 @@ public partial class MainWindow
         var head = new DockPanel();
         var count = new Border { CornerRadius = new CornerRadius(12), Padding = new Thickness(10, 3, 10, 4), VerticalAlignment = VerticalAlignment.Center, Background = Res("WarnSoft") };
         DockPanel.SetDock(count, Dock.Right);
-        count.Child = new TextBlock { Text = $"{have} / {total}", FontSize = 13, FontWeight = FontWeights.Black, Foreground = new SolidColorBrush(Color.FromRgb(0xC9, 0x84, 0x10)) };
+        count.Child = new TextBlock { Text = $"{have} / {total}", FontSize = 13, FontWeight = FontWeights.Black, Foreground = Res("CoinInk") };
         head.Children.Add(count);
         var title = IconLabel(IconRes("IconSparkle"), "Nadir dostlar", 16, 16, filled: true);
         TextElement_SetForeground(title, Res("Text"));
@@ -122,13 +122,19 @@ public partial class MainWindow
                 stand.Children.Add(SpecialImage(a.Id, kind, 60, locked: !owned));
                 var label = new TextBlock
                 {
-                    Text = owned ? Special.Title(a.Name, kind) : "???", FontSize = 11.5, FontWeight = FontWeights.ExtraBold,
+                    Text = owned ? NameOf(Special.Keyed(a.Id, kind)) : "???", FontSize = 11.5, FontWeight = FontWeights.ExtraBold,
                     HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res(owned ? "Text" : "Faint"), Margin = new Thickness(0, 4, 0, 0)
                 };
                 var tile = new StackPanel { Margin = new Thickness(6, 0, 6, 4), Width = 80 };
                 tile.Children.Add(stand);
                 tile.Children.Add(label);
-                if (!owned) tile.ToolTip = kind == SpecialKind.Golden ? "Altın bir dost" : "Minik bir yavru";
+                if (owned)
+                {
+                    var key = Special.Keyed(a.Id, kind);
+                    tile.Background = Brushes.Transparent; tile.Cursor = System.Windows.Input.Cursors.Hand; tile.ToolTip = $"{Special.Title(a.Name, kind)} · adını değiştir";
+                    tile.MouseLeftButtonUp += (_, _) => RenameAnimal(key);
+                }
+                else tile.ToolTip = kind == SpecialKind.Golden ? "Altın bir dost" : "Minik bir yavru";
                 row.Children.Add(tile);
             }
             body.Children.Add(row);
@@ -157,11 +163,12 @@ public partial class MainWindow
         }
         if (visitorRoot == null || visitorCanvas != zooCanvas) BuildVisitorNode();
         var v = zooWorld.Keeper;
-        if (double.IsNaN(v.X)) { visitorRoot!.Visibility = Visibility.Hidden; return; }
+        if (double.IsNaN(v.X) || zooWorld.Riding) { visitorRoot!.Visibility = Visibility.Hidden; return; }
         visitorRoot!.Visibility = Visibility.Visible;
 
         var frames = ExplorerFrames();
         var frame = v.State == WanderState.Walk && frames.Length > 1 ? frames[1 + (int)(v.WalkTime * 8) % (frames.Length - 1)] : frames[0];
+        frame = Lit(frame, soft: true);
         if (!ReferenceEquals(visitorImg!.Source, frame)) visitorImg.Source = frame;
         visitorFlip!.ScaleX = v.FacingRight ? 1 : -1;
         visitorHop!.Y = Math.Round(v.HopOffset * 0.7);

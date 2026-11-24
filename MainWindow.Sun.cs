@@ -15,7 +15,7 @@ public partial class MainWindow
 {
     SkyPalette sunPalette = DayCycle.Day;
     string sunPaletteKey = "";
-    Rectangle? skyRect, lightRect;
+    Rectangle? skyRect;
     Image? hillsImg;
     Border? grassLayer;
     Canvas? starLayer, cloudLayer, fireflyLayer;
@@ -48,7 +48,6 @@ public partial class MainWindow
         grassLayer = new Border { Background = GrassBrush(), IsHitTestVisible = false };
         sceneAnimals = new Canvas();
         sceneAnimals.SizeChanged += (_, e) => { zooWorld.Width = e.NewSize.Width; zooWorld.Height = e.NewSize.Height; };
-        lightRect = new Rectangle { IsHitTestVisible = false };
         fireflyLayer = Fireflies();
 
         // Sahne üstünde jeton hapı (sağ üst). Ödül jetonları buraya uçar.
@@ -60,23 +59,30 @@ public partial class MainWindow
         sceneCoinPill = new Border
         {
             Background = Res("Surface"), CornerRadius = new CornerRadius(20), Padding = new Thickness(6, 5, 14, 5), Child = coinRow,
-            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 12, 20, 0),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 84, 20, 0),
             Effect = (Effect)FindResource("SoftShadow"), RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = sceneCoinPop,
-            Cursor = Cursors.Hand, ToolTip = "Jetonların. Dostlar sekmesinde yeni dostlar alabilirsin."
+            Cursor = Cursors.Hand, ToolTip = "Jetonların. Tıkla, markete git."
         };
-        sceneCoinPill.MouseLeftButtonUp += (_, _) => NavZoo.IsChecked = true;
+        sceneCoinPill.MouseLeftButtonUp += (_, _) => OpenMarket();
+        var sceneMarket = new Button
+        {
+            Content = IconLabel(BagIcon, "Market", 14, 15), Style = (Style)FindResource("Primary"), Padding = new Thickness(14, 7, 14, 7),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 134, 20, 0),
+            ToolTip = "Yeni dostlar ve bahçe süsleri", Focusable = false
+        };
+        sceneMarket.Click += (_, _) => OpenMarket();
 
         // Bahçe boşken: çimende küçük bir davet.
-        var hint = IconLabel(IconRes("IconPaw"), "Bahçen seni bekliyor. İlk dostunu Dostlar'dan al!", 13, 14, filled: true);
+        var hint = IconLabel(IconRes("IconPaw"), "Bahçen seni bekliyor. İlk dostunu marketten al!", 13, 14, filled: true);
         TextElement_SetForeground(hint, Res("Text"));
         emptyHint = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0xD8, 0xFF, 0xFF, 0xFF)), CornerRadius = new CornerRadius(16), Padding = new Thickness(14, 8, 14, 8),
+            Background = Res("Surface"), CornerRadius = new CornerRadius(16), Padding = new Thickness(14, 8, 14, 8),
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Child = hint, Cursor = Cursors.Hand
         };
-        emptyHint.MouseLeftButtonUp += (_, _) => NavZoo.IsChecked = true;
+        emptyHint.MouseLeftButtonUp += (_, _) => OpenMarket();
 
-        foreach (var el in new FrameworkElement[] { skyRect, starLayer, cloudLayer, hillsImg, grassLayer, sceneAnimals, lightRect, fireflyLayer, emptyHint, sceneCoinPill })
+        foreach (var el in new FrameworkElement[] { skyRect, starLayer, cloudLayer, hillsImg, grassLayer, sceneAnimals, fireflyLayer, emptyHint, sceneCoinPill, sceneMarket })
             SunScene.Children.Add(el);
 
         zooCanvas = sceneAnimals;
@@ -109,7 +115,6 @@ public partial class MainWindow
         hillsImg!.Margin = new Thickness(0, horizon - 41 * PixelScale, 0, 0);
         grassLayer!.Margin = new Thickness(0, horizon - 9, 0, 0);
         sceneAnimals!.Margin = new Thickness(0, horizon - 44, 0, 0);
-        lightRect!.Margin = new Thickness(0, horizon - 9, 0, 0);
         fireflyLayer!.Margin = new Thickness(0, horizon, 0, 0);
         emptyHint!.Margin = new Thickness(0, 0, 0, Math.Max(150, (h - horizon) * 0.5));
     }
@@ -142,6 +147,7 @@ public partial class MainWindow
         }
 
         zooWorld.Mood = !active ? ZooMood.Free : sw.IsRunning ? ZooMood.Calm : ZooMood.Play;
+        zooWorld.SessionOn = active;
         zooWorld.KeeperWalking = active && sw.IsRunning;
         zooWorld.Night = DayCycle.IsNight(sunPalette);
         zooWorld.Noon = !zooWorld.Night && sunPalette.Stars < 0.1 && (Theme == GardenTheme.Day || (Theme == GardenTheme.Auto && DateTime.Now.Hour is >= 11 and < 16));
@@ -195,11 +201,11 @@ public partial class MainWindow
         if (skyRect != null)
         {
             skyRect.Fill = new LinearGradientBrush(C(p.SkyTop), C(p.SkyBottom), 90);
-            lightRect!.Fill = new SolidColorBrush(C(p.Light));
             starLayer!.Opacity = p.Stars;
             fireflyLayer!.Opacity = p.Fireflies;
             fireflyLayer.Visibility = p.Fireflies > 0.02 ? Visibility.Visible : Visibility.Collapsed;
             cloudLayer!.Opacity = p.Clouds;
+            ApplyLight();
             if (lightChanged && SunScene.ActualWidth > 0) { hillsFor = ""; UpdateHills(SunScene.ActualWidth); }
         }
 
@@ -212,6 +218,7 @@ public partial class MainWindow
         if (owlImg != null) owlImg.Visibility = p.Moon >= 0.5 ? Visibility.Visible : Visibility.Collapsed;
         if (campGlow != null) campGlow.Opacity = 0.25 + 0.75 * Math.Clamp(p.Moon, 0, 1);
         if (widgetMode) ApplyWidgetBackground();
+        UpdateTopBarTone();
         UpdateRing();
     }
 
@@ -226,7 +233,7 @@ public partial class MainWindow
         var key = $"{w}|{sunPalette.Light:X}";
         if (key == hillsFor || hillsImg == null) return;
         hillsFor = key;
-        hillsImg.Source = HillsBitmap(w, C(sunPalette.Light));
+        hillsImg.Source = HillsBitmap(w, LightMul(sunPalette.Light));
         hillsImg.Width = w * PixelScale;
         hillsImg.Height = 48 * PixelScale;
     }
@@ -235,13 +242,7 @@ public partial class MainWindow
     {
         const int H = 48;
         var px = new uint[W * H];
-        double la = light.A / 255.0;
-        uint Tint(uint c)
-        {
-            double r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
-            r += (light.R - r) * la; g += (light.G - g) * la; b += (light.B - b) * la;
-            return 0xFF000000u | ((uint)r << 16) | ((uint)g << 8) | (uint)b;
-        }
+        uint Tint(uint c) => Multiply(c, light);
         void Set(int x, int y, uint c) { if (x >= 0 && x < W && y >= 0 && y < H) px[y * W + x] = Tint(c); }
 
         for (int x = 0; x < W; x++)
@@ -357,7 +358,7 @@ public partial class MainWindow
             preview.Children.Add(new Border
             {
                 CornerRadius = new CornerRadius(0, 0, 14, 14), Height = 20, VerticalAlignment = VerticalAlignment.Bottom,
-                Background = new SolidColorBrush(Mix(Color.FromRgb(0x8D, 0xC9, 0x63), C(p.Light), C(p.Light).A / 255.0))
+                Background = new SolidColorBrush(Multiply(Color.FromRgb(0x8D, 0xC9, 0x63), LightMul(p.Light)))
             });
             var disc = new Ellipse { Width = 24, Height = 24, Margin = new Thickness(0, 10, 0, 0), VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Center,
                 Fill = new RadialGradientBrush(C(p.DiscA), C(p.DiscB)) };
@@ -369,7 +370,7 @@ public partial class MainWindow
             {
                 var auto = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(5, 1, 6, 2), Margin = new Thickness(0, 0, 6, 4),
                     HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Background = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)),
-                    Child = new TextBlock { Text = "A", FontSize = 11, FontWeight = FontWeights.Black, Foreground = Res("Text") } };
+                    Child = new TextBlock { Text = "A", FontSize = 11, FontWeight = FontWeights.Black, Foreground = new SolidColorBrush(Cocoa) } };
                 preview.Children.Add(auto);
             }
             var frame = new Border

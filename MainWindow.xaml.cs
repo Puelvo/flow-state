@@ -36,7 +36,10 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        AppTheme.Instance.Set(data.DarkTheme);
         InitializeComponent();
+        ThemeDark.IsChecked = data.DarkTheme;
+        SourceInitialized += (_, _) => AppTheme.TitleBar(this);
         RingHost.LayoutTransform = NormalRingScale;
         BuildSunScene();
         data.CountdownMinutes = Math.Clamp(data.CountdownMinutes, DialMin, DialMax);
@@ -479,7 +482,7 @@ public partial class MainWindow : Window
             HourPips.Children.Add(more);
         }
         if (active) HourPips.Children.Add(PipStar(false));
-        PipsLabel.Text = !active ? "" : laps == 0 ? "İlk yıldızın yolda" : $"{laps} saat tamamlandı";
+        PipsLabel.Text = "";       // yıldızlar kendini anlatır
     }
 
     void Tick()
@@ -618,6 +621,7 @@ public partial class MainWindow : Window
         if (HistoryView.Visibility == Visibility.Visible) UpdateHistory();
         if (ZooView.Visibility == Visibility.Visible) UpdateZoo();
         if (TimerView.Visibility == Visibility.Visible) UpdateSunScene();
+        UpdateTopBarTone();
     }
 
     void UpdateTimerView()
@@ -786,7 +790,7 @@ public partial class MainWindow : Window
 
     static Brush HeatBrush(Color acc, int level, Brush empty) => level == 0
         ? empty
-        : new SolidColorBrush(Lighten(acc, level switch { 1 => 0.72, 2 => 0.48, 3 => 0.24, _ => 0 }));
+        : new SolidColorBrush(Soft(acc, level switch { 1 => 0.72, 2 => 0.48, 3 => 0.24, _ => 0 }));
 
     void UpdateWeekly(Dictionary<DateTime, int> per)
     {
@@ -919,7 +923,7 @@ public partial class MainWindow : Window
                 Text = Fmt(sec), Foreground = Res("Text"), FontSize = 13, FontWeight = FontWeights.ExtraBold,
                 VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0)
             });
-            right.Children.Add(Pill($"%{pct:0}", new SolidColorBrush(Lighten(col, 0.82)), new SolidColorBrush(Tint(col, 0.62, 0)), true));
+            right.Children.Add(Pill($"%{pct:0}", new SolidColorBrush(Soft(col, 0.82)), new SolidColorBrush(AppTheme.Instance.Dark ? Lighten(col, 0.45) : Tint(col, 0.62, 0)), true));
             DockPanel.SetDock(right, Dock.Right);
             head.Children.Add(right);
             var dot = new System.Windows.Shapes.Ellipse
@@ -1045,7 +1049,7 @@ public partial class MainWindow : Window
         var badge = new Border
         {
             Width = 36, Height = 36, CornerRadius = new CornerRadius(18), Margin = new Thickness(0, 0, 12, 0),
-            Background = new SolidColorBrush(Lighten(col, 0.8)),
+            Background = new SolidColorBrush(Soft(col, 0.8)),
             Child = new System.Windows.Shapes.Ellipse { Width = 12, Height = 12, Fill = new SolidColorBrush(col) }
         };
         var name = new TextBlock
@@ -1216,7 +1220,7 @@ public partial class MainWindow : Window
             CourseList.Visibility = Visibility.Visible;
             HourPips.Visibility = Visibility.Visible;
             PipsLabel.Visibility = Visibility.Visible;
-            TimerPanel.Margin = new Thickness(24, 4, 24, 18);
+            TimerPanel.Margin = new Thickness(24, 76, 24, 18);
             RingHost.Margin = new Thickness(0, 6, 0, 0);
             RingHost.LayoutTransform = NormalRingScale;
             BtnRow.Margin = new Thickness(0, 14, 0, 0);
@@ -1265,12 +1269,13 @@ public partial class MainWindow : Window
     static Color Lighten(Color c, double t) => Color.FromRgb(
         (byte)(c.R + (255 - c.R) * t), (byte)(c.G + (255 - c.G) * t), (byte)(c.B + (255 - c.B) * t));
 
+    /// <summary>Rengin kart üstünde duran yumuşak zemini (açık temada pastel, koyuda kısık).</summary>
+    static Color Soft(Color c, double t) => AppTheme.Instance.Dark ? Mix(AppTheme.Instance["Surface"], c, Math.Max(0.28, 1 - t)) : Lighten(c, t);
     static Color Mix(Color a, Color b, double t) => Color.FromRgb(
         (byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
 
     static double Luma(Color c) => (0.299 * c.R + 0.587 * c.G + 0.114 * c.B) / 255.0;
 
-    static readonly Color Cream = Color.FromRgb(0xFF, 0xF9, 0xF1), Peach = Color.FromRgb(0xFD, 0xEB, 0xDD);
     static readonly Color Cocoa = Color.FromRgb(0x3B, 0x2C, 0x25);
 
     // Seçilen tema rengini tüm uygulamaya uygular: vurgu ve türevleri, krem zemin ve pastel ışık lekeleri.
@@ -1279,15 +1284,18 @@ public partial class MainWindow : Window
         var c = WidgetColor();
         var res = Application.Current.Resources;
         res["Accent"] = new SolidColorBrush(c);
-        res["AccentDim"] = new SolidColorBrush(Lighten(c, 0.58));
-        res["AccentSoft"] = res["Sel"] = new SolidColorBrush(Lighten(c, 0.84));
-        res["AccentDeep"] = new SolidColorBrush(Tint(c, 0.72, 0));
+        bool dark = AppTheme.Instance.Dark;
+        var card = AppTheme.Instance["Surface"];
+        res["AccentDim"] = new SolidColorBrush(dark ? Mix(card, c, 0.45) : Lighten(c, 0.58));
+        res["AccentSoft"] = res["Sel"] = new SolidColorBrush(dark ? Mix(card, c, 0.26) : Lighten(c, 0.84));
+        res["AccentDeep"] = new SolidColorBrush(dark ? Lighten(c, 0.45) : Tint(c, 0.72, 0));
         // Açık tema renklerinde (sarı, gri) beyaz yazı okunmaz: kakao kullan.
         res["OnAccent"] = new SolidColorBrush(Luma(c) > 0.72 ? Cocoa : Colors.White);
-        res["BgGrad"] = new LinearGradientBrush(Mix(Cream, c, 0.03), Mix(Peach, c, 0.07), new Point(0, 0), new Point(1, 1));
+        res["BgGrad"] = new LinearGradientBrush(Mix(AppTheme.Instance["BgA"], c, 0.03), Mix(AppTheme.Instance["BgB"], c, 0.07), new Point(0, 0), new Point(1, 1));
 
-        static void Blob(GradientStop a, GradientStop b, Color col, byte alpha)
+        void Blob(GradientStop a, GradientStop b, Color col, byte alpha)
         {
+            if (dark) alpha = (byte)(alpha / 5);
             a.Color = Color.FromArgb(alpha, col.R, col.G, col.B);
             b.Color = Color.FromArgb(0, col.R, col.G, col.B);
         }
@@ -1295,6 +1303,29 @@ public partial class MainWindow : Window
         Blob(Blob2A, Blob2B, Color.FromRgb(0xFF, 0xC9, 0xA8), 0x70);
         Blob(BlobC1, BlobC2, Color.FromRgb(0xFF, 0xE3, 0x9A), 0x6A);
         Blob(Blob4A, Blob4B, Mix(Color.FromRgb(0xB8, 0xF0, 0xD6), c, 0.25), 0x60);
+    }
+
+    /// <summary>Ayarlar: açık / koyu tema.</summary>
+    void AppTheme_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!ready) return;
+        data.DarkTheme = ThemeDark.IsChecked == true;
+        AppTheme.Instance.Set(data.DarkTheme);
+        ApplyTheme();
+        AppTheme.TitleBar(this);
+        Store.Save(data);
+        zooKey = "";
+        BuildSettings();
+        BuildGardenThemeTiles();
+        UpdateAll();
+    }
+
+    /// <summary>Çalış'ta logo yazısı gökyüzünün üstünde: göğün koyuluğuna göre beyaz ya da kakao.</summary>
+    void UpdateTopBarTone()
+    {
+        if (TimerView.Visibility == Visibility.Visible && !widgetMode)
+            LogoText.Foreground = new SolidColorBrush(Luma(C(sunPalette.SkyTop)) < 0.6 ? Colors.White : Cocoa);
+        else LogoText.SetResourceReference(TextBlock.ForegroundProperty, "Text");
     }
 
     // Widget: bahçe sahnesi kapalı; zemin vaktin gökyüzü (güneş saat gökyüzünde asılı durur).

@@ -94,6 +94,9 @@ public class AppData
 
     // Bahçe teması (yalnız bu cihazda): "auto" günün saatine göre; "dawn" / "day" / "sunset" / "night" sabit.
     public string GardenTheme { get; set; } = "auto";
+
+    public bool DarkTheme { get; set; }                                        // koyu tema (yalnız bu cihazda)
+    public Dictionary<string, string> AnimalNames { get; set; } = new();       // hayvanlara verilen isimler (yalnız bu cihazda)
 }
 
 public static class Store

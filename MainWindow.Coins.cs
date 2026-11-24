@@ -11,7 +11,7 @@ namespace FlowState;
 // jetonlar çemberden saçılıp Bahçe sekmesine uçar, sekme her jetonda zıplar. Hepsi FxLayer'da çizilir.
 public partial class MainWindow
 {
-    static readonly Brush CoinText = new SolidColorBrush(Color.FromRgb(0xC9, 0x84, 0x10));
+    Brush CoinText => Res("CoinInk");
     readonly Random fxRnd = new();
 
     void ShowCoinReward(Session s, bool timeUp, Special? special = null, string? growth = null)

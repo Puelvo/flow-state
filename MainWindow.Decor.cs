@@ -253,6 +253,7 @@ public partial class MainWindow
         for (double x = -30; x <= W + 30; x += 20) pts.Add(new Point(x, pathY(x) - 4));
         var road = new Polyline { Points = pts, Stroke = new SolidColorBrush(Color.FromArgb(0x8C, 0xE6, 0xD3, 0x9C)), StrokeThickness = 24, StrokeLineJoin = PenLineJoin.Round, IsHitTestVisible = false };
         var roadMid = new Polyline { Points = pts, Stroke = new SolidColorBrush(Color.FromArgb(0x50, 0xF4, 0xEA, 0xC8)), StrokeThickness = 12, StrokeLineJoin = PenLineJoin.Round, IsHitTestVisible = false };
+        (roadLine, roadMidLine) = (road, roadMid);
         Put(road, 0, 0, -100000);
         Put(roadMid, 0, 0, -99999);
 

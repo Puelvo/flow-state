@@ -6,7 +6,7 @@ public enum GardenTheme { Auto, Dawn, Day, Sunset, Night }
 /// <summary>Bir vaktin renkleri. Renkler 0xAARRGGBB; oranlar 0..1.</summary>
 public readonly record struct SkyPalette(
     uint SkyTop, uint SkyBottom,      // gökyüzü geçişi (üst → ufuk)
-    uint Light,                       // yere (tepeler, çimen, hayvanlar) vuran ışık: yarı saydam örtü
+    uint Light,                       // yere (tepeler, çimen, süsler) vuran ışık: renk ve güç; görsellerle çarpılır
     uint Ray,                         // güneş saatin ilerleme halkası
     uint DiscA, uint DiscB,           // güneş/ay diskinin ortası ve kenarı
     uint Glow,                        // diskin çevresindeki hâle
@@ -19,7 +19,7 @@ public readonly record struct SkyPalette(
 public static class DayCycle
 {
     public static readonly SkyPalette Night = new(
-        0xFF10163A, 0xFF2C3770, 0x6B1A2350, 0xFFC9D3FF, 0xFFF4F1E8, 0xFFEAE6DA, 0x55C9D3FF, 1, 1, 0.25, 1);
+        0xFF0E1540, 0xFF34458F, 0xA02E6FC0, 0xFFC9D3FF, 0xFFF4F1E8, 0xFFEAE6DA, 0x38C9D3FF, 1, 1, 0.72, 1);
     public static readonly SkyPalette Dawn = new(
         0xFF8FA8E8, 0xFFFFC6B4, 0x1FFF9C8A, 0xFFFF8FA3, 0xFFFFF2D8, 0xFFFFC796, 0x66FFB8A0, 0.25, 0, 0.9, 0);
     public static readonly SkyPalette Day = new(

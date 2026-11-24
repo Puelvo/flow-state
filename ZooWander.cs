@@ -30,6 +30,8 @@ public sealed class Wanderer
     public bool[] Has = { true, true, true, true, true };   // bu hayvanda hangi pozlar var (çizen taraf doldurur)
     public Wanderer? Follow;              // yavru: annesinin/babasının peşinden gider
     public bool Welcoming;                // gezgini karşılamaya gidiyor (varınca selamlar)
+    public double Companion;              // > 0: gezginin peşinde dolaşıyor (selamlaştılar)
+    public double Dodge;                  // > 0: jeep'e yol veriyor
     public ZooSpotKind Intent;            // gittiği yer: gölet (su içer) ya da ağaç gölgesi (dinlenir)
 
     /// <summary>Yürümüyorken gösterilecek poz.</summary>
@@ -60,7 +62,8 @@ public sealed class ZooWorld
     public readonly Wanderer Keeper = new() { Id = "explorer" };
     public ZooMood Mood = ZooMood.Free;
     public bool Night;                     // gece: hayvanlar uykucu
-    public bool KeeperWalking;             // çalışırken gezgin çimende dolaşır
+    public bool SessionOn;                 // oturum var (mola dahil): gezgin jeep'tedir
+    public bool KeeperWalking;             // oturum çalışıyor: jeep patikada gezer
     public double Celebrating;             // > 0: hayvanlar gezginin etrafında (oturum bitti)
     public const double KeeperSpeed = 34, CelebrateSeconds = 11;
     public double Width, Height;
@@ -86,7 +89,8 @@ public sealed class ZooWorld
             if (Math.Abs(y - oy) >= SpaceY) continue;
             worst = Math.Min(worst, Math.Abs(x - ox) - Space(self, o));
         }
-        if (!double.IsNaN(Keeper.X) && Math.Abs(y - Keeper.Y) < SpaceY)
+        if (!double.IsNaN(JeepX) && Math.Abs(y - JeepY) < 30) worst = Math.Min(worst, Math.Abs(x - JeepX) - 112);
+        if (!Riding && !double.IsNaN(Keeper.X) && Math.Abs(y - Keeper.Y) < SpaceY)
             worst = Math.Min(worst, Math.Abs(x - Keeper.X) - 56);
         return worst;
     }
@@ -204,6 +208,8 @@ public sealed class ZooWorld
     {
         var k = Keeper;
         if (double.IsNaN(k.X) || Width <= 0) return;
+        if (Riding) StepOut();
+        visiting = null;
         k.State = WanderState.Idle; k.Timer = CelebrateSeconds; k.HopT = 0; k.HappyTimer = 2.5;
         Celebrating = CelebrateSeconds;
         CallAnimals(k);
@@ -212,9 +218,27 @@ public sealed class ZooWorld
     void UpdateKeeper(double dt)
     {
         var k = Keeper;
-        if (double.IsNaN(k.X)) { k.Y = (MinY + MaxY) / 2; k.X = Clear(Width * 0.5, k.Y); k.FacingRight = true; k.Timer = 2; }
+        bool fresh = double.IsNaN(k.X);
+        if (fresh) { k.Y = (MinY + MaxY) / 2; k.X = Clear(Width * 0.5, k.Y); k.FacingRight = true; k.Timer = 2; }
         if (k.HopT >= 0) { k.HopT += dt / HopSeconds; if (k.HopT >= 1) k.HopT = -1; }
         if (k.HappyTimer > 0) k.HappyTimer -= dt;
+
+        if (SessionOn && !double.IsNaN(JeepX))
+        {
+            // Oturum başladı: (kutlama sürüyorsa biter) gezgin jeep'ine koşar ve biner.
+            if (Celebrating > 0) { Celebrating = 0; foreach (var w in Animals) w.Welcoming = false; }
+            visiting = null;
+            if (fresh) Riding = true;                              // uygulama süren oturumla açıldı
+            if (!Riding)
+            {
+                (k.TargetX, k.TargetY) = (JeepX, JeepY + 2);
+                if (StepTo(k, KeeperSpeed * 3.2, dt)) { Riding = true; k.State = WanderState.Idle; }
+            }
+            if (Riding) { k.X = JeepX; k.Y = JeepY; k.FacingRight = JeepRight; }
+            return;
+        }
+        if (Riding) StepOut();
+
         if (Celebrating > 0)
         {
             Celebrating -= dt;
@@ -222,32 +246,124 @@ public sealed class ZooWorld
             k.State = WanderState.Idle;
             return;
         }
+
+        // Yaya: hayvanların arasında gezer, birinin yanına gidip selamlaşır; selamlaşan bir süre peşinden gelir.
+        if (visiting is { } v && (v.Held || v.Pose == ZooPose.Sleep || !Animals.Contains(v) || (visitTime -= dt) < 0)) { visiting = null; k.State = WanderState.Idle; k.Timer = 1; }
         switch (k.State)
         {
             case WanderState.Walk:
-                double dx = k.TargetX - k.X, dy = k.TargetY - k.Y, dist = Math.Sqrt(dx * dx + dy * dy), step = KeeperSpeed * dt;
-                if (Math.Abs(dx) > 1) k.FacingRight = dx > 0;
-                k.WalkTime += dt;
-                if (dist > step) { k.X += dx / dist * step; k.Y += dy / dist * step; }
-                else { k.X = k.TargetX; k.Y = k.TargetY; k.State = WanderState.Idle; k.Timer = KeeperWalking ? Rand(0.6, 1.6) : Rand(4, 9); }
+                if (visiting is { } a)
+                {
+                    if (Math.Abs(a.X - k.X) < 150 && a.State == WanderState.Walk && !a.Arriving) { a.State = WanderState.Idle; a.Timer = 4; }   // onu bekler
+                    k.TargetX = Math.Clamp(a.X + (k.X < a.X ? -58 : 58), MinX, MaxX);
+                    k.TargetY = Math.Clamp(a.Y + 2, MinY, MaxY);
+                }
+                if (!StepTo(k, KeeperSpeed, dt)) break;
+                k.State = WanderState.Idle; k.Timer = Rand(1.5, 4);
+                if (visiting is { } m)
+                {
+                    visiting = null;
+                    m.State = WanderState.Greet; m.Timer = Rand(2.6, 3.6); m.Pose = ZooPose.Stand; m.HappyTimer = m.Timer; m.HopT = 0;
+                    m.GreetCooldown = Rand(12, 20); m.Companion = Rand(16, 28);
+                    m.FacingRight = m.X < k.X; k.FacingRight = k.X < m.X;
+                    k.HopT = 0; k.HappyTimer = 1.5; k.Timer = m.Timer + Rand(0.4, 1.4);
+                }
                 break;
             default:
                 k.Timer -= dt;
                 if (k.Timer > 0) break;
-                // Çalışırken çimende uzun uzun yürür; boşta ara sıra birkaç adım atar.
-                if (KeeperWalking || rng.NextDouble() < 0.35)
+                var awake = Animals.Where(w => !double.IsNaN(w.X) && !w.Held && !w.Arriving && w.Pose != ZooPose.Sleep && w.State != WanderState.Greet && w.Companion <= 0).ToList();
+                if (awake.Count > 0 && rng.NextDouble() < 0.5) { visiting = awake[rng.Next(awake.Count)]; visitTime = 14; }
+                else
                 {
-                    double reach = KeeperWalking ? Rand(120, 320) : Rand(40, 110);
                     double dir = k.X > Width * 0.7 ? -1 : k.X < Width * 0.3 ? 1 : (rng.Next(2) == 0 ? -1 : 1);
-                    double tx = Math.Clamp(k.X + dir * reach, MinX + 30, MaxX - 30);
-                    k.TargetY = KeeperWalking && PathY != null ? Math.Clamp(PathY(tx), MinY, MaxY) : Math.Clamp(k.Y + Rand(-30, 30), MinY + 10, MaxY);
-                    k.TargetX = KeeperWalking && PathY != null ? tx : Clear(tx, k.TargetY);
-                    k.State = WanderState.Walk;
+                    k.TargetY = Math.Clamp(k.Y + Rand(-60, 60), MinY + 10, MaxY);
+                    k.TargetX = Clear(Math.Clamp(k.X + dir * Rand(110, 280), MinX + 30, MaxX - 30), k.TargetY);
+                    // Yanındaki dostlar da yürümeye başlar.
+                    foreach (var w in Animals) if (w.Companion > 0 && w.State == WanderState.Idle && w.Pose != ZooPose.Sleep) w.Timer = Math.Min(w.Timer, Rand(0.2, 1));
                 }
-                else k.Timer = Rand(3, 7);
+                k.State = WanderState.Walk;
                 break;
         }
         k.X = Math.Clamp(k.X, MinX, MaxX); k.Y = Math.Clamp(k.Y, MinY, MaxY);
+    }
+
+    Wanderer? visiting;                    // gezginin yanına gittiği hayvan
+    double visitTime;
+
+    /// <summary>Hedefe bir adım atar; vardıysa true.</summary>
+    static bool StepTo(Wanderer k, double speed, double dt)
+    {
+        double dx = k.TargetX - k.X, dy = k.TargetY - k.Y, dist = Math.Sqrt(dx * dx + dy * dy), step = speed * dt;
+        if (Math.Abs(dx) > 1) k.FacingRight = dx > 0;
+        k.State = WanderState.Walk;
+        k.WalkTime += dt * Math.Max(1, speed / KeeperSpeed * 0.6);
+        if (dist <= step) { k.X = k.TargetX; k.Y = k.TargetY; return true; }
+        k.X += dx / dist * step; k.Y += dy / dist * step;
+        return false;
+    }
+
+    // ---------- jeep ----------
+
+    /// <summary>Gezgin jeep'te mi. Oturum başlayınca biner, bitince iner; molada jeep durur ama içinde kalır.</summary>
+    public bool Riding;
+    public double JeepX = double.NaN, JeepY, JeepV, JeepRoll;   // konum (tekerleklerin bastığı nokta), hız, gidilen yol
+    public bool JeepRight = true;
+    public const double JeepSpeed = 64;
+    double jeepPause, jeepBlocked;
+    double JeepMin => Math.Min(110, Width / 2);
+    double JeepMax => Math.Max(JeepMin, Width - 110);
+
+    void StepOut()
+    {
+        Riding = false;
+        Keeper.X = Math.Clamp(JeepX + (JeepRight ? -24 : 24), MinX, MaxX);
+        Keeper.Y = Math.Clamp(JeepY + 30, MinY, MaxY);
+        Keeper.State = WanderState.Idle; Keeper.Timer = 1.5; Keeper.HopT = 0;
+    }
+
+    void UpdateJeep(double dt)
+    {
+        if (PathY == null) return;
+        if (double.IsNaN(JeepX)) JeepX = Width * 0.3;
+        double target = 0;
+        if (Riding && KeeperWalking)
+        {
+            if (jeepPause > 0) jeepPause -= dt;
+            else if (JeepRight ? JeepX >= JeepMax - 1 : JeepX <= JeepMin + 1)
+            {
+                if (JeepV < 5) { JeepRight = !JeepRight; jeepPause = 0.6; }           // yolun sonu: döner
+            }
+            else if (!Blocked(dt)) target = Math.Min(JeepSpeed, Math.Max(12, (JeepRight ? JeepMax - JeepX : JeepX - JeepMin) * 0.9));
+        }
+        JeepV += Math.Clamp(target - JeepV, -150 * dt, 55 * dt);
+        JeepX = Math.Clamp(JeepX + (JeepRight ? 1 : -1) * JeepV * dt, JeepMin, JeepMax);
+        JeepRoll += JeepV * dt;
+        JeepY = Math.Clamp(PathY(JeepX), MinY, MaxY);
+    }
+
+    /// <summary>Yoldaki hayvanlar kenara çekilir; yakındaysa jeep bekler (en fazla birkaç saniye).</summary>
+    bool Blocked(double dt)
+    {
+        bool stop = false;
+        double dir = JeepRight ? 1 : -1;
+        foreach (var w in Animals)
+        {
+            if (double.IsNaN(w.X) || w.Held) continue;
+            double ahead = (w.X - JeepX) * dir, road = PathY!(w.X);
+            if (ahead < -30 || ahead > 210 || Math.Abs(w.Y - road) > 30) continue;
+            if (w.Dodge <= 0)
+            {
+                double side = w.Y >= road ? 1 : -1;
+                if (road + side * 56 < MinY || road + side * 56 > MaxY) side = -side;
+                double y = road + side * Rand(50, 72), x = w.X + dir * Rand(0, 40);
+                Aim(w, () => (x + Rand(-40, 40), y));
+                w.State = WanderState.Walk; w.Pose = ZooPose.Stand; w.Arriving = false; w.Intent = ZooSpotKind.None; w.Dodge = 3;
+            }
+            if (ahead > 0 && ahead < 125) stop = true;
+        }
+        jeepBlocked = stop ? jeepBlocked + dt : 0;
+        return stop && jeepBlocked < 3.5;
     }
 
     /// <summary>Herkes (uyuyanlar uyanır) gezginin çevresine, iki yanına yayılarak gelir.</summary>
@@ -270,6 +386,7 @@ public sealed class ZooWorld
     {
         if (Width <= 0 || Height <= 0) return;
         dt = Math.Min(dt, 0.1);
+        UpdateJeep(dt);
         UpdateKeeper(dt);
 
         foreach (var w in Animals)
@@ -279,6 +396,8 @@ public sealed class ZooWorld
             if (w.NameTimer > 0) w.NameTimer -= dt;
             if (w.GreetCooldown > 0) w.GreetCooldown -= dt;
             if (w.HappyTimer > 0) w.HappyTimer -= dt;
+            if (w.Companion > 0) w.Companion = SessionOn ? 0 : w.Companion - dt;
+            if (w.Dodge > 0) w.Dodge -= dt;
             if (w.HopT >= 0) { w.HopT += dt / HopSeconds; if (w.HopT >= 1) w.HopT = -1; }
 
             switch (w.State)
@@ -299,7 +418,7 @@ public sealed class ZooWorld
 
                 case WanderState.Walk:
                     double dx = w.TargetX - w.X, dy = w.TargetY - w.Y;
-                    double dist = Math.Sqrt(dx * dx + dy * dy), step = Speed * (w.Welcoming ? 2.4 : 1) * dt;   // gezgine koşar adım
+                    double dist = Math.Sqrt(dx * dx + dy * dy), step = Speed * (w.Welcoming ? 2.4 : w.Dodge > 0 ? 2.8 : w.Companion > 0 ? 1.4 : 1) * dt;   // gezgine koşar adım
                     if (Math.Abs(dx) > 1) w.FacingRight = dx > 0;
                     if (dist <= step)
                     {
@@ -329,6 +448,7 @@ public sealed class ZooWorld
     /// <summary>Yürüyüş bitince ne yapacağını seçer: ayakta bekler, oturur, bir şeyler yer ya da uyur.</summary>
     void Rest(Wanderer w)
     {
+        if (w.Companion > 0) { w.Pose = ZooPose.Stand; w.Timer = Rand(1, 2.5); return; }
         if (w.Intent == ZooSpotKind.Pond && Pond is { } p)
         {
             w.Intent = ZooSpotKind.None;
@@ -391,6 +511,13 @@ public sealed class ZooWorld
         {
             // Kutlama sürerken gezginin yakınında dolaşırlar.
             Aim(w, () => (Keeper.X + Rand(-170, 170), Keeper.Y + Rand(-34, 34)));
+            return;
+        }
+        if (w.Companion > 0 && !double.IsNaN(Keeper.X))
+        {
+            // Gezginle birlikte yürür: gittiği yerin yanında bir nokta.
+            var (kx, ky) = Keeper.State == WanderState.Walk ? (Keeper.TargetX, Keeper.TargetY) : (Keeper.X, Keeper.Y);
+            Aim(w, () => (kx + (rng.Next(2) == 0 ? -1 : 1) * Rand(64, 120), ky + Rand(-18, 18)));
             return;
         }
         if (w.Follow is { } parent && !double.IsNaN(parent.X) && rng.NextDouble() < 0.8)

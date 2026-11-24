@@ -7,21 +7,13 @@ using System.Windows.Shapes;
 
 namespace FlowState;
 
-// Çalıştıkça büyüyen bahçe:
-//  - Bugünün çiçekleri: bugün çalışılan her yarım saat (süren oturum dahil) çimende bir çiçek açar (en fazla 24).
-//    Yerleri güne göre sabittir; ertesi gün bahçe yeni çiçeklere yer açar.
+// Bahçenin süsleri ve seri ağacı:
+//  - Süsler marketten jetonla alınır (çit, çiçekler, tabela, kamp ateşi, çadır, salıncak); kendiliğinden gelmez.
 //  - Seri ağacı: güncel seriyle büyür (filiz → fidan → genç ağaç → ağaç → meyveli ağaç). Seri bozulursa kurumaz;
 //    ulaştığı boyda kalır ama yaprakları dökülür, yeniden başlayınca yeşerir.
-//  - Kalıcı süsler: toplam çalışma süresiyle açılır (çit, tabela, kamp ateşi, çadır, salıncak).
 public partial class MainWindow
 {
-    const int FlowerSeconds = 30 * 60, MaxFlowers = 24;
-
-    /// <summary>Toplam süreyle açılan süsler: (kimlik, ad, gereken saat).</summary>
-    static readonly (string Id, string Name, int Hours)[] Milestones =
-    {
-        ("fence", "Çit", 10), ("sign", "Tabela", 25), ("campfire", "Kamp ateşi", 50), ("tent", "Çadır", 100), ("swing", "Salıncak", 200),
-    };
+    const int MaxFlowers = 14;
 
     static readonly string[] StageNames = { "Tohum", "Filiz", "Fidan", "Genç ağaç", "Ağaç", "Meyveli ağaç" };
 
@@ -31,9 +23,8 @@ public partial class MainWindow
     string growthKey = "", growthCalcKey = "";
     int growthDays;
     bool growthBare;
-    List<string> growthUnlocked = new();
     int flowersShown = -1;
-    DateTime flowersDay;
+    bool flowersBloom;                    // az önce alındı: açılış animasyonu
     Image? campfireImg;
     Ellipse? campGlow;
     readonly List<(double L, double T, double R, double B)> growthBlocks = new();
@@ -52,33 +43,29 @@ public partial class MainWindow
         return (n, n > 0);
     }
 
-    double TotalHours() => SecondsSince(DateTime.MinValue, null) / 3600.0;
-
     // ---------- her saniye ----------
 
     void UpdateGrowth()
     {
         if (sceneAnimals == null || zooWorld.Width <= 0 || decorFor.Length == 0) return;
-        int flowers = Math.Min(MaxFlowers, (int)(SecondsSince(Today, null) / FlowerSeconds));
-        // Seri ve toplam süre yalnızca oturum listesi, gün ya da (süren oturumda) dakika değişince yeniden hesaplanır.
+        // Seri yalnızca oturum listesi, gün ya da (süren oturumda) dakika değişince yeniden hesaplanır.
         var calcKey = $"{data.Sessions.Count}|{Today:yyyyMMdd}|{(active ? ActiveSeconds / 60 : -1)}";
         if (calcKey != growthCalcKey)
         {
             growthCalcKey = calcKey;
             (growthDays, growthBare) = TreeDays();
-            double hours = TotalHours();
-            growthUnlocked = Milestones.Where(m => hours >= m.Hours).Select(m => m.Id).ToList();
         }
-        var (days, bare, unlocked) = (growthDays, growthBare, growthUnlocked);
-        int stage = StageOf(days);
-        var key = $"{decorFor}|{Today:yyyyMMdd}|{stage}|{bare}|{string.Join(",", unlocked)}";
+        var (days, bare) = (growthDays, growthBare);
+        var owned = ZooCatalog.Decors.Where(x => Zoo.Owns(data, x.Key)).Select(x => x.Id).ToList();
+        int stage = StageOf(days), flowers = owned.Contains("flowers") ? MaxFlowers : 0;
+        var key = $"{decorFor}|{Today:yyyyMMdd}|{stage}|{bare}|{string.Join(",", owned)}";
         if (key != growthKey)
         {
             growthKey = key;
-            RebuildGrowth(stage, bare, days, unlocked);
+            RebuildGrowth(stage, bare, days, owned);
             flowersShown = -1;
         }
-        if (flowers != flowersShown || flowersDay != Today) SetFlowers(flowers);
+        if (flowers != flowersShown) SetFlowers(flowers);
         if (campfireImg != null) campfireImg.Source = Campfire()[(int)(Environment.TickCount64 / 500) % 2];
         if (campGlow != null) campGlow.Opacity = 0.25 + 0.75 * Math.Clamp(sunPalette.Moon, 0, 1);       // gece parlar
     }
@@ -113,7 +100,7 @@ public partial class MainWindow
             Block((x - 12, y - 10, x + 12, y + 6));
         }
 
-        // Kalıcı süsler
+        // Satın alınmış süsler
         foreach (var id in unlocked)
             switch (id)
             {
@@ -154,24 +141,18 @@ public partial class MainWindow
             }
     }
 
-    /// <summary>Bugünün çiçekleri: sayı artınca yenisi sıçrayarak açar. Yerler güne göre sabit, engellerden uzak.</summary>
+    /// <summary>Çiçekler: yerleri sabit, engellerden uzak. Yeni alınınca sıçrayarak açarlar.</summary>
     void SetFlowers(int count)
     {
-        bool newDay = flowersDay != Today;
-        flowersDay = Today;
-        if (newDay || count < flowerImgs.Count)
-        {
-            foreach (var f in flowerImgs) sceneAnimals!.Children.Remove(f.Img);
-            flowerImgs.Clear();
-        }
+        foreach (var f in flowerImgs) sceneAnimals!.Children.Remove(f.Img);
+        flowerImgs.Clear();
         var spots = FlowerSpots();
-        bool animate = flowersShown >= 0 && !newDay;
+        bool animate = flowersBloom;
+        flowersBloom = false;
         for (int i = flowerImgs.Count; i < count && i < spots.Count; i++)
         {
             var (x, y) = spots[i];
             var img = PixImage(Flower(i));
-            img.IsHitTestVisible = true;
-            img.ToolTip = $"Bugünün {i + 1}. çiçeği: her yarım saatlik çalışma bir çiçek açar.";
             Canvas.SetLeft(img, Math.Round(x - img.Width / 2)); Canvas.SetTop(img, Math.Round(y - img.Height));
             Panel.SetZIndex(img, (int)y - 3);
             sceneAnimals!.Children.Add(img);
@@ -188,10 +169,10 @@ public partial class MainWindow
         flowersShown = count;
     }
 
-    /// <summary>Güne göre sabit çiçek yerleri: engellerden, düğme alanından ve birbirinden uzak.</summary>
+    /// <summary>Sabit çiçek yerleri: engellerden, düğme alanından ve birbirinden uzak.</summary>
     List<(double X, double Y)> FlowerSpots()
     {
-        var rnd = new Random(Today.Year * 1000 + Today.DayOfYear);
+        var rnd = new Random(2026);
         var list = new List<(double, double)>();
         double W = zooWorld.Width, top = zooWorld.Top + 10, bottom = zooWorld.Bottom;
         var blocks = zooWorld.Blocks.ToList();
@@ -207,58 +188,106 @@ public partial class MainWindow
         return list;
     }
 
-    /// <summary>Oturum sonunda ödül kartına yazılacak büyüme haberi (yeni süs, ağaç büyüdü); yoksa null.</summary>
+    /// <summary>Oturum sonunda ödül kartına yazılacak haber (seri ağacı büyüdü); yoksa null.</summary>
     string? GrowthNote(Session done)
     {
-        double after = TotalHours(), before = after - done.Seconds / 3600.0;
-        var fresh = Milestones.FirstOrDefault(m => before < m.Hours && after >= m.Hours);
-        if (fresh.Id != null) return $"Yeni süs: {fresh.Name} bahçene geldi!";
         var per = PerDay();
         int streak = Streak(per);
         // Bu oturum bugünü ilk kez "çalışılmış gün" yaptıysa seri bir arttı.
         int todayBefore = per.GetValueOrDefault(Today) - done.Seconds;
         if (todayBefore < StatsMath.MinDaySeconds && streak > 0 && StageOf(streak) > StageOf(streak - 1))
             return $"Seri ağacın büyüdü: {StageNames[StageOf(streak)]}!";
-        int flowers = (int)(SecondsSince(Today, null) / FlowerSeconds), was = (int)((SecondsSince(Today, null) - done.Seconds) / FlowerSeconds);
-        if (flowers > was) return flowers - was == 1 ? "Bahçende bir çiçek açtı." : $"Bahçende {Math.Min(MaxFlowers, flowers) - Math.Min(MaxFlowers, was)} çiçek açtı.";
         return null;
     }
 
-    // ---------- Dostlar sayfası: süsler kartı ----------
+    // ---------- süsler: Dostlar kartı ve market ----------
 
+    static BitmapSource DecorIcon(string id) => id switch
+    { "fence" => Fence(), "flowers" => Flower(0), "sign" => Sign(), "campfire" => Campfire()[0], "tent" => Tent(), _ => SwingIcon() };
+
+    Image DecorImage(string id, double size, double opacity)
+    {
+        var img = new Image { Source = DecorIcon(id), Width = size, Height = size, Stretch = Stretch.Uniform, Opacity = opacity };
+        RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.NearestNeighbor);
+        return img;
+    }
+
+    /// <summary>Dostlar sayfası: bahçedeki süsler; alınmamışlar soluk ve fiyatlı, tıklayınca markete gider.</summary>
     FrameworkElement DecorCard()
     {
-        double hours = TotalHours();
         var body = new StackPanel();
         body.Children.Add(new TextBlock { Text = "Bahçe süsleri", FontSize = 16, FontWeight = FontWeights.ExtraBold, Foreground = Res("Text") });
         var (days, bare) = TreeDays();
         body.Children.Add(new TextBlock
         {
-            Text = $"Toplam {Math.Floor(hours)} saat çalıştın. Seri ağacın: {StageNames[StageOf(days)]}{(bare ? " (yaprakları döküldü)" : "")}. Bugünün her yarım saati bir çiçek açar.",
+            Text = $"Süsleri marketten alabilirsin. Seri ağacın: {StageNames[StageOf(days)]}{(bare ? " (yaprakları döküldü)" : "")}.",
             Style = (Style)FindResource("PageSub"), FontSize = 13
         });
         var row = new WrapPanel { Margin = new Thickness(-6, 12, 0, 0) };
-        foreach (var m in Milestones)
+        foreach (var x in ZooCatalog.Decors)
         {
-            bool open = hours >= m.Hours;
+            bool have = Zoo.Owns(data, x.Key);
             var stand = new Grid { Width = 74, Height = 74 };
-            stand.Children.Add(new Ellipse { Width = 66, Height = 66, Fill = Res(open ? "GoodSoft" : "Panel2") });
-            var src = m.Id switch { "fence" => Fence(), "sign" => Sign(), "campfire" => Campfire()[0], "tent" => Tent(), _ => SwingIcon() };
-            var img = new Image { Source = src, Width = 52, Height = 52, Stretch = Stretch.Uniform, Opacity = open ? 1 : 0.35 };
-            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.NearestNeighbor);
-            stand.Children.Add(img);
-            var tile = new StackPanel { Margin = new Thickness(6, 0, 6, 4), Width = 86 };
+            stand.Children.Add(new Ellipse { Width = 66, Height = 66, Fill = Res(have ? "GoodSoft" : "Panel2") });
+            stand.Children.Add(DecorImage(x.Id, 50, have ? 1 : 0.4));
+            var tile = new StackPanel { Margin = new Thickness(6, 0, 6, 4), Width = 86, Background = Brushes.Transparent };
             tile.Children.Add(stand);
-            tile.Children.Add(new TextBlock { Text = m.Name, FontSize = 12, FontWeight = FontWeights.ExtraBold, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res(open ? "Text" : "Muted"), Margin = new Thickness(0, 4, 0, 0) });
-            tile.Children.Add(new TextBlock
+            tile.Children.Add(new TextBlock { Text = x.Name, FontSize = 12, FontWeight = FontWeights.ExtraBold, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res(have ? "Text" : "Muted"), Margin = new Thickness(0, 4, 0, 0) });
+            if (have)
+                tile.Children.Add(new TextBlock { Text = "bahçende", FontSize = 11, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res("Good") });
+            else
             {
-                Text = open ? "bahçende" : "çalıştıkça gelecek", FontSize = 11, FontWeight = FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res(open ? "Good" : "Faint")
-            });
+                tile.Children.Add(PriceRow(x.Price, 13, 12));
+                tile.Cursor = System.Windows.Input.Cursors.Hand;
+                tile.MouseLeftButtonUp += (_, _) => GoZoo(ZooScreen.Shop);
+            }
             row.Children.Add(tile);
         }
         body.Children.Add(row);
         return new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0, 18, 0, 0), Child = body };
+    }
+
+    StackPanel PriceRow(int price, double coin, double font)
+    {
+        var p = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        p.Children.Add(CoinGlyph(coin));
+        p.Children.Add(new TextBlock { Text = price.ToString(), FontSize = font, FontWeight = FontWeights.ExtraBold, Foreground = Res("Text"), Margin = new Thickness(5, 0, 0, 1), VerticalAlignment = VerticalAlignment.Center });
+        return p;
+    }
+
+    /// <summary>Market: süs kartı.</summary>
+    FrameworkElement DecorShopCard(GardenDecor x, int balance)
+    {
+        bool enough = balance >= x.Price;
+        var body = new StackPanel();
+        var stage = new Grid { Width = 92, Height = 92, HorizontalAlignment = HorizontalAlignment.Center };
+        var disc = new Ellipse();
+        if (enough) disc.SetResourceReference(Shape.FillProperty, "AccentSoft"); else disc.Fill = Res("Panel2");
+        stage.Children.Add(disc);
+        stage.Children.Add(DecorImage(x.Id, 60, enough ? 1 : 0.45));
+        body.Children.Add(stage);
+        body.Children.Add(new TextBlock { Text = x.Name, FontSize = 16, FontWeight = FontWeights.Black, Foreground = Res("Text"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 2) });
+        body.Children.Add(PriceRow(x.Price, 16, 14));
+        var buy = new Button
+        {
+            Content = enough ? "Satın al" : "Biraz daha odaklan", Style = (Style)FindResource(enough ? "Primary" : "Btn"), IsEnabled = enough,
+            FontSize = 13.5, Padding = new Thickness(10, 8, 10, 8), Margin = new Thickness(0, 12, 0, 0), HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        buy.Click += (_, _) =>
+        {
+            if (Zoo.BuyDecor(data, x) != BuyResult.Ok) return;
+            if (x.Id == "flowers") flowersBloom = true;
+            Save();
+            NavTimer.IsChecked = true;                 // süs bahçeye kondu: görsün
+        };
+        body.Children.Add(buy);
+        return new Border { Style = (Style)FindResource("Card"), Width = 180, Padding = new Thickness(14, 16, 14, 14), Margin = new Thickness(0, 0, 14, 16), Child = body };
+    }
+
+    void OpenMarket()
+    {
+        NavZoo.IsChecked = true;
+        GoZoo(ZooScreen.Shop);
     }
 
     // ---------- sprite'lar ----------

@@ -7,6 +7,12 @@ public sealed record Animal(string Id, string Name, string Emoji, string MapId, 
 /// <summary>Bir harita (tema). Sıralı açılır; aktif harita arka planı ve marketi belirler.</summary>
 public sealed record ZooMap(string Id, string Name, string Emoji);
 
+/// <summary>Satın alınabilen bahçe süsü. Satın alma hayvanlarla aynı listede "decor:&lt;id&gt;" kimliğiyle tutulur.</summary>
+public sealed record GardenDecor(string Id, string Name, int Price)
+{
+    public string Key => "decor:" + Id;
+}
+
 /// <summary>Hayvan kataloğu: tüm haritalar ve hayvanlar burada tanımlı.</summary>
 public static class ZooCatalog
 {
@@ -23,6 +29,12 @@ public static class ZooCatalog
         new("rhino",    "Gergedan", "🦏", "savanna", 80),
         new("elephant", "Fil",      "🐘", "savanna", 120),
         new("lion",     "Aslan",    "🦁", "savanna", 200),
+    };
+
+    public static readonly GardenDecor[] Decors =
+    {
+        new("fence", "Çit", 25), new("flowers", "Çiçekler", 30), new("sign", "Tabela", 40),
+        new("campfire", "Kamp ateşi", 70), new("tent", "Çadır", 120), new("swing", "Salıncak", 160),
     };
 
     public static Animal? Find(string id) => Animals.FirstOrDefault(a => a.Id == id);
@@ -79,11 +91,20 @@ public static class Zoo
     public static bool Owns(AppData d, string animalId)
         => d.OwnedAnimals.Any(o => o.AnimalId == animalId);
 
-    /// <summary>Bakiyenin yettiği, henüz alınmamış hayvan sayısı (Market vurgusu ve yeniden çizim için).</summary>
+    /// <summary>Bakiyenin yettiği, henüz alınmamış hayvan ve süs sayısı (Market vurgusu ve yeniden çizim için).</summary>
     public static int AffordableCount(AppData d, string mapId, int balance)
-        => ZooCatalog.InMap(mapId).Count(a => !Owns(d, a.Id) && balance >= a.Price);
+        => ZooCatalog.InMap(mapId).Count(a => !Owns(d, a.Id) && balance >= a.Price)
+         + ZooCatalog.Decors.Count(x => !Owns(d, x.Key) && balance >= x.Price);
 
     public static bool MapComplete(AppData d, string mapId) => ZooCatalog.InMap(mapId).All(a => Owns(d, a.Id));
+
+    public static BuyResult BuyDecor(AppData d, GardenDecor x)
+    {
+        if (Owns(d, x.Key)) return BuyResult.AlreadyOwned;
+        if (Balance(d) < x.Price) return BuyResult.NotEnough;
+        d.OwnedAnimals.Add(new OwnedAnimal { AnimalId = x.Key, Price = x.Price });
+        return BuyResult.Ok;
+    }
 
     public static BuyResult Buy(AppData d, string animalId)
     {
@@ -130,7 +151,7 @@ public static class ZooSpecials
             if (Zoo.Luck(s.Id + "#nadir") >= Chance(s.Seconds)) continue;
             // Seans bittiğinde bahçede olan hayvanlar.
             var end = DateTime.SpecifyKind(s.Start, DateTimeKind.Local).ToUniversalTime().AddSeconds(s.Seconds);
-            var owned = d.OwnedAnimals.Where(o => o.BoughtAt <= end).Select(o => o.AnimalId).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToList();
+            var owned = d.OwnedAnimals.Where(o => o.BoughtAt <= end && ZooCatalog.Find(o.AnimalId) != null).Select(o => o.AnimalId).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToList();
             if (owned.Count == 0) continue;
 
             var first = Zoo.Luck(s.Id + "#tur") < GoldenShare ? SpecialKind.Golden : SpecialKind.Baby;

@@ -87,7 +87,7 @@
         </Grid>
 
         <!-- Üst çubuk: logo, ikonlu sekmeler, widget düğmesi -->
-        <Grid x:Name="TopBar" Grid.Row="0" Margin="24,18,24,4">
+        <Grid x:Name="TopBar" Grid.Row="0" Margin="24,18,24,4" Panel.ZIndex="5">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -98,43 +98,43 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Image Source="pack://application:,,,/Assets/logo.png" Width="38" Height="38"
                        RenderOptions.BitmapScalingMode="HighQuality"/>
-                <TextBlock Text="Flow State" FontSize="19" FontWeight="Black" Margin="10,0,0,0"
+                <TextBlock x:Name="LogoText" Text="Flow State" FontSize="19" FontWeight="Black" Margin="10,0,0,0"
                            Foreground="{StaticResource Text}" VerticalAlignment="Center"/>
             </StackPanel>
 
-            <Border Grid.Column="1" Style="{StaticResource SegBar}" CornerRadius="24" Padding="5">
+            <Border Grid.Column="1" Padding="0,5">
                 <StackPanel Orientation="Horizontal">
-                    <RadioButton x:Name="NavTimer" GroupName="nav" Style="{StaticResource Nav}" IsChecked="True" Checked="Nav_Checked">
+                    <RadioButton x:Name="NavTimer" GroupName="nav" Style="{StaticResource NavChip}" IsChecked="True" Checked="Nav_Checked">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconTimer}" Style="{StaticResource Icon}"/>
                             <TextBlock Text="Çalış" Margin="7,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                     </RadioButton>
-                    <RadioButton x:Name="NavStats" GroupName="nav" Style="{StaticResource Nav}" Checked="Nav_Checked">
+                    <RadioButton x:Name="NavStats" GroupName="nav" Style="{StaticResource NavChip}" Checked="Nav_Checked">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconChart}" Style="{StaticResource Icon}"/>
                             <TextBlock Text="İstatistik" Margin="7,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                     </RadioButton>
-                    <RadioButton x:Name="NavHistory" GroupName="nav" Style="{StaticResource Nav}" Checked="Nav_Checked">
+                    <RadioButton x:Name="NavHistory" GroupName="nav" Style="{StaticResource NavChip}" Checked="Nav_Checked">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconHistory}" Style="{StaticResource Icon}"/>
                             <TextBlock Text="Geçmiş" Margin="7,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                     </RadioButton>
-                    <RadioButton x:Name="NavZoo" GroupName="nav" Style="{StaticResource Nav}" Checked="Nav_Checked">
+                    <RadioButton x:Name="NavZoo" GroupName="nav" Style="{StaticResource NavChip}" Checked="Nav_Checked">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconPaw}" Style="{StaticResource Icon}" StrokeThickness="2"/>
                             <TextBlock Text="Dostlar" Margin="7,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                     </RadioButton>
-                    <RadioButton x:Name="NavSocial" GroupName="nav" Style="{StaticResource Nav}" Checked="Nav_Checked">
+                    <RadioButton x:Name="NavSocial" GroupName="nav" Style="{StaticResource NavChip}" Checked="Nav_Checked">
                         <StackPanel x:Name="NavSocialPanel" Orientation="Horizontal">
                             <Path Data="{StaticResource IconPeople}" Style="{StaticResource Icon}"/>
                             <TextBlock Text="Sosyal" Margin="7,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                     </RadioButton>
-                    <RadioButton x:Name="NavSettings" GroupName="nav" Style="{StaticResource Nav}" Checked="Nav_Checked">
+                    <RadioButton x:Name="NavSettings" GroupName="nav" Style="{StaticResource NavChip}" Checked="Nav_Checked">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconSliders}" Style="{StaticResource Icon}"/>
                             <TextBlock Text="Ayarlar" Margin="7,0,0,0" VerticalAlignment="Center"/>
@@ -158,10 +158,10 @@
             Çalış: bahçenin kendisi. Arkada gökyüzü + tepeler + çimen + hayvanlar ve gezgin (SunScene, MainWindow.Sun.cs kurar);
             önde güneş saat (gökyüzünde) ve çimenin üstünde düğmeler. Renkler günün saatine ya da seçilen temaya göre değişir.
         -->
-        <Grid x:Name="TimerView" Grid.Row="1" ClipToBounds="True">
+        <Grid x:Name="TimerView" Grid.Row="0" Grid.RowSpan="2" ClipToBounds="True">
             <Grid x:Name="SunScene"/>
 
-            <Grid x:Name="TimerPanel" Margin="24,4,24,18">
+            <Grid x:Name="TimerPanel" Margin="24,76,24,18">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -182,7 +182,7 @@
                     </ListBox>
                     <!-- Ders ekle / sil: gökyüzünde okunsun diye beyaz hapın içinde -->
                     <Border x:Name="ToolsBar" HorizontalAlignment="Center" Margin="0,2,0,0" CornerRadius="16" Padding="4,2"
-                            Background="#B8FFFFFF">
+                            Background="{StaticResource Glass}">
                         <StackPanel x:Name="CourseTools" Orientation="Horizontal" VerticalAlignment="Center">
                             <Button Style="{StaticResource Ghost}" FontSize="12" Padding="10,5" Click="ToggleAdd_Click">
                                 <StackPanel Orientation="Horizontal">
@@ -225,9 +225,9 @@
                     </Image>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="200">
                         <TextBlock x:Name="TimerCourseName" Text="Bir ders seç" FontSize="20" FontWeight="Black"
-                                   Foreground="{StaticResource Text}"
+                                   Foreground="#3B2C25"
                                    TextAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="56"/>
-                        <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="40" FontWeight="Black" Foreground="{StaticResource Text}"
+                        <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="40" FontWeight="Black" Foreground="#3B2C25"
                                    Typography.NumeralAlignment="Tabular" HorizontalAlignment="Center" Margin="0,0,0,2"/>
                         <!-- Durum rozeti: hazır / odakta / mola -->
                         <Border x:Name="StatusPill" HorizontalAlignment="Center" Margin="0,2,0,0" Padding="10,3,12,4"
@@ -246,7 +246,7 @@
 
                 <!-- Saat yıldızları: gökyüzünde, okunsun diye yarı saydam beyaz hapın içinde -->
                 <Border x:Name="PipsBar" Grid.Row="2" HorizontalAlignment="Center" Margin="0,4,0,0" CornerRadius="14" Padding="12,4,12,5"
-                        Background="#A6FFFFFF">
+                        Background="{StaticResource Glass}">
                     <StackPanel>
                         <StackPanel x:Name="HourPips" Orientation="Horizontal" HorizontalAlignment="Center" Height="18"/>
                         <TextBlock x:Name="PipsLabel" Foreground="{StaticResource Text}" FontSize="13" FontWeight="ExtraBold"
@@ -600,6 +600,28 @@
                         <TextBlock x:Name="HexError" Foreground="{StaticResource Danger}" FontSize="12.5" FontWeight="Bold" Margin="2,10,0,0" Visibility="Collapsed"
                                    Text="Geçerli bir renk gir (örn. #FF5A6A)."/>
                     </StackPanel>
+                </Border>
+
+                <!-- Görünüm: açık / koyu tema -->
+                <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Right" Style="{StaticResource SegBar}" Background="{StaticResource Panel2}" Effect="{x:Null}"
+                                VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="ThemeLight" GroupName="apptheme" Style="{StaticResource Seg}" Content="Açık" IsChecked="True" Checked="AppTheme_Checked"/>
+                                <RadioButton x:Name="ThemeDark" GroupName="apptheme" Style="{StaticResource Seg}" Content="Koyu" Checked="AppTheme_Checked"/>
+                            </StackPanel>
+                        </Border>
+                        <Grid Style="{StaticResource SettingsBadge}">
+                            <Ellipse Fill="{DynamicResource AccentSoft}"/>
+                            <Path Data="M14.5,4 A8.5,8.5 0 1 0 20,15 A7,7 0 0 1 14.5,4 Z" Fill="{DynamicResource Accent}" Width="20" Height="20" Stretch="Uniform"/>
+                        </Grid>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Görünüm" Style="{StaticResource H}" Margin="0"/>
+                            <TextBlock Text="Koyu temada sayfalar ve kartlar koyulaşır; bahçenin vakti aşağıdaki ayardan seçilir."
+                                       Style="{StaticResource Body}" FontSize="13" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </DockPanel>
                 </Border>
 
                 <!-- Bahçe teması: Çalış'taki bahçenin vakti (BuildGardenThemeTiles kurar) -->

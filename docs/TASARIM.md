@@ -3,6 +3,11 @@
 Eski koyu "uzay" teması yerine açık, sıcak ve oyunsu bir tema. Hedef: tatlı, davetkâr, dokununca tepki veren bir arayüz.
 Bütün kaynaklar `App.xaml` içinde. Tema rengi (Ayarlar'dan seçilen) `ApplyTheme()` ile `Accent*` kaynaklarına yazılır.
 
+## Açık / koyu tema
+- Renkler `AppTheme.cs` tablosunda (her anahtarın açık ve koyu değeri). `App.xaml` fırçaları oraya bağlıdır; tema canlı değişir.
+- Sabit renk yazma: kart üstünde `Surface`/`Text`..., gökyüzünde duran haplarda `Glass`/`Chip` kullan. Güneş saatin içindeki yazı her temada kakaodur.
+- Vaktin ışığı saydam örtü değildir: görseller ışık rengiyle çarpılır (`MainWindow.Light.cs`), böylece gece renkler solmaz.
+
 ## İlkeler
 - **Krem zemin, beyaz kartlar.** Sayfa zemini krem/şeftali geçişi (`BgGrad`). İçerik beyaz kartlarda (`Style="{StaticResource Card}"`).
   Kartlar 24 px köşe yarıçaplı ve yumuşak, sıcak tonlu gölgeli (`SoftShadow`). Kenar çizgisi yok.
@@ -48,7 +53,7 @@ Vurgu kaynaklarını C#'ta kullanırken **dinamik** bağla: `el.SetResourceRefer
 - `TextBox`, `PasswordBox`, `ListBoxItem` (ders chip'i), `ScrollBar`, `ToolTip` varsayılan stilleri yeni temada.
 
 ## Sayfa düzeni
-- Üstte logo + ortada ikonlu sekme çubuğu (beyaz hap) + sağda Widget düğmesi.
+- Üstte logo + ortada ayrı ayrı haplarda ikonlu sekmeler (ortak bar yok) + sağda Widget düğmesi. Çalış'ta gökyüzü bunların arkasına uzanır.
 - Sayfa başlığı: `PageTitle` + altında bir satırlık sıcak açıklama (`PageSub`).
 - İçerik en fazla ~880 px genişlikte, ortalı; kartlar arası 14–18 px boşluk.
 

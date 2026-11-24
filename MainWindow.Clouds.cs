@@ -8,7 +8,7 @@ namespace FlowState;
 // Konumları sahne genişliğinin oranı olarak tutulur; pencere büyüyünce gökyüzüne yeniden yayılırlar.
 public partial class MainWindow
 {
-    sealed class SkyCloud { public Image Img = null!; public double U, Y, Speed; }
+    sealed class SkyCloud { public Image Img = null!; public BitmapSource Base = null!; public double U, Y, Speed; }
     readonly List<SkyCloud> skyClouds = new();
 
     /// <summary>
@@ -37,7 +37,7 @@ public partial class MainWindow
             var img = new Image { Source = bmp, Width = bmp.PixelWidth * PixelScale, Height = bmp.PixelHeight * PixelScale, Opacity = alpha };
             RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.NearestNeighbor);
             layer.Children.Add(img);
-            skyClouds.Add(new SkyCloud { Img = img, U = u, Y = y, Speed = speed });
+            skyClouds.Add(new SkyCloud { Img = img, Base = bmp, U = u, Y = y, Speed = speed });
         }
         return layer;
     }

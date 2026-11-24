@@ -125,7 +125,7 @@ public partial class MainWindow
         marketHost.Children.Add(zooMarketBtn);
         marketHost.Children.Add(zooMarketBadge);
 
-        ZooRoot.Children.Add(Header("Dostlar", "Bahçen Çalış sekmesinde; odaklandıkça jeton biriktir, yeni dostlar kat.", balance, marketHost));
+        ZooRoot.Children.Add(Header("Dostlar", "Adını değiştirmek için bir dostuna tıkla. Yenileri markette.", balance, marketHost));
 
         // Bahçedekiler: sevinç pozunda, pastel kürsülerde. Tıklayınca bahçeye (Çalış) gider.
         var owned = ZooCatalog.InMap(ActiveMapId).Where(a => ZooDemo || Zoo.Owns(data, a.Id)).ToList();
@@ -149,7 +149,10 @@ public partial class MainWindow
                 stand.Children.Add(SpriteImage(a.Id, 60, silhouette: false, ZooPose.Happy));
                 var tile = new StackPanel { Margin = new Thickness(6, 0, 6, 4), Width = 80 };
                 tile.Children.Add(stand);
-                tile.Children.Add(new TextBlock { Text = a.Name, FontSize = 12, FontWeight = FontWeights.ExtraBold, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res("Text"), Margin = new Thickness(0, 4, 0, 0) });
+                tile.Children.Add(new TextBlock { Text = NameOf(a.Id), FontSize = 12.5, FontWeight = FontWeights.ExtraBold, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Res("Text"), Margin = new Thickness(0, 4, 0, 0) });
+                tile.Children.Add(new TextBlock { Text = a.Name, FontSize = 11, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Res("Muted") });
+                tile.Background = Brushes.Transparent; tile.Cursor = Cursors.Hand; tile.ToolTip = "Adını değiştir";
+                tile.MouseLeftButtonUp += (_, _) => RenameAnimal(a.Id);
                 row.Children.Add(tile);
             }
             ownedBody.Children.Add(row);
@@ -194,19 +197,26 @@ public partial class MainWindow
             Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center
         };
         back.Click += (_, _) => GoZoo(ZooScreen.Garden);
-        ZooRoot.Children.Add(Header("Market", "Biriktirdiğin jetonlarla yeni bir dost edin.", balance, back));
+        ZooRoot.Children.Add(Header("Market", "Biriktirdiğin jetonlarla yeni bir dost ya da bahçe süsü al.", balance, back));
 
+        TextBlock Section(string text) => new() { Text = text, Style = (Style)FindResource("H"), Margin = new Thickness(0, 22, 0, 12) };
         var left = ZooCatalog.InMap(ActiveMapId).Where(a => !Zoo.Owns(data, a.Id)).OrderBy(a => a.Price).ToList();
-        if (left.Count == 0)
+        ZooRoot.Children.Add(Section("Dostlar"));
+        if (left.Count == 0) ZooRoot.Children.Add(Friendly(IconRes("IconSparkle"), "Hepsi bahçende!", "Bu haritadaki bütün hayvanları topladın. Harikasın.", filledIcon: true));
+        else
         {
-            ZooRoot.Children.Add(Friendly(IconRes("IconSparkle"), "Hepsi bahçende!", "Bu haritadaki bütün hayvanları topladın. Harikasın.", filledIcon: true));
-            return;
+            var shop = new WrapPanel { Margin = new Thickness(0, 0, -14, 0) };
+            int i = 0;
+            foreach (var a in left) shop.Children.Add(ShopCard(a, balance, i++));
+            ZooRoot.Children.Add(shop);
         }
 
-        var shop = new WrapPanel { Margin = new Thickness(0, 22, -14, 0) };
-        int i = 0;
-        foreach (var a in left) shop.Children.Add(ShopCard(a, balance, i++));
-        ZooRoot.Children.Add(shop);
+        var decors = ZooCatalog.Decors.Where(x => !Zoo.Owns(data, x.Key)).OrderBy(x => x.Price).ToList();
+        if (decors.Count == 0) return;
+        ZooRoot.Children.Add(Section("Bahçe süsleri"));
+        var row = new WrapPanel { Margin = new Thickness(0, 0, -14, 0) };
+        foreach (var x in decors) row.Children.Add(DecorShopCard(x, balance));
+        ZooRoot.Children.Add(row);
     }
 
     /// <summary>Market kartı: pastel kürsüde hayvan, adı, jetonlu fiyatı ve "Satın al" (yetmiyorsa kilitli).</summary>
@@ -391,8 +401,8 @@ public partial class MainWindow
 
         // Sıcak, şeftali-krem geçişli büyük kart
         var warm = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
-        warm.GradientStops.Add(new GradientStop(Color.FromRgb(0xFF, 0xF6, 0xE4), 0));
-        warm.GradientStops.Add(new GradientStop(Color.FromRgb(0xFF, 0xFF, 0xFF), 0.75));
+        warm.GradientStops.Add(new GradientStop(AppTheme.Instance["WarmTop"], 0));
+        warm.GradientStops.Add(new GradientStop(AppTheme.Instance["Surface"], 0.75));
         var card = new Border
         {
             Style = (Style)FindResource("Card"), Background = warm, Padding = new Thickness(30, 20, 30, 34),
@@ -415,7 +425,7 @@ public partial class MainWindow
     /// <summary>Bir hayvanın sahnedeki görseli: gölge + sprite + üstünde isim etiketi (beyaz hap, altında küçük kuyruk).</summary>
     sealed record ZooNode(Wanderer W, Canvas Root, Image Img, ScaleTransform Flip, TranslateTransform Hop,
                           FrameworkElement Bubble, Border BubbleFace, Path BubbleTail, TextBlock BubbleText, Path Heart,
-                          BitmapSource[] Frames, BitmapSource?[] Poses, string Name, double Scale);
+                          BitmapSource[] Frames, BitmapSource?[] Poses, double Scale);
 
     /// <param name="kind">null: hayvanın kendisi; Golden: altına boyalı ve parıltılı; Baby: küçük, annesini izler.</param>
     void AddNode(Canvas canvas, Animal a, Wanderer w, SpecialKind? kind)
@@ -434,9 +444,11 @@ public partial class MainWindow
         var hop = new TranslateTransform();
         var img = new Image { Width = S, Height = S, Source = poses[0], Cursor = Cursors.Hand, RenderTransform = new TransformGroup { Children = { flip, hop } } };
         RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.NearestNeighbor);
-        // Tıklama: zıplar. Basılı tutup sürükleme: hayvanı taşır, bırakınca oraya konar.
+        img.MouseRightButtonUp += (_, e) => { RenameAnimal(w.Id); e.Handled = true; };
+        // Tıklama: zıplar. Çift ya da sağ tık: adını değiştir. Basılı tutup sürükleme: hayvanı taşır, bırakınca oraya konar.
         Point? press = null;
         Vector grab = default;
+        bool twice = false;                                          // çift tık: adını değiştir
         void Release()
         {
             press = null;
@@ -446,6 +458,7 @@ public partial class MainWindow
         img.MouseLeftButtonDown += (_, e) =>
         {
             press = e.GetPosition(canvas);
+            twice = e.ClickCount == 2;
             img.CaptureMouse();
             e.Handled = true;
         };
@@ -465,10 +478,12 @@ public partial class MainWindow
         img.MouseLeftButtonUp += (_, e) =>
         {
             if (press == null) return;
-            bool wasDrag = w.Held;
+            bool wasDrag = w.Held, rename = twice;
             Release();
             img.ReleaseMouseCapture();
-            if (!wasDrag) zooWorld.Poke(w);
+            if (wasDrag) { }
+            else if (rename) RenameAnimal(w.Id);
+            else zooWorld.Poke(w);
             e.Handled = true;
         };
         img.LostMouseCapture += (_, _) => { if (press != null) Release(); };   // pencere odağı giderse hayvan havada kalmasın
@@ -521,8 +536,7 @@ public partial class MainWindow
         root.Children.Add(body);
         root.Children.Add(bubble);
         canvas.Children.Add(root);
-        string name = kind is { } k ? Special.Title(a.Name, k) : a.Name;
-        zooNodes.Add(new ZooNode(w, root, img, flip, hop, bubble, face, tail, text, heart, frames, poses, name, scale));
+        zooNodes.Add(new ZooNode(w, root, img, flip, hop, bubble, face, tail, text, heart, frames, poses, scale));
     }
 
     void EnsureZooTimer()
@@ -541,8 +555,10 @@ public partial class MainWindow
         zooClock.Restart();
         zooWorld.Update(dt);
         TickKeeper();
+        TickJeep(dt);
         TickAmbient(dt);
         TickClouds(dt);
+        Relight();
 
         const double S = ZooWorld.Sprite;
         foreach (var n in zooNodes)
@@ -561,11 +577,12 @@ public partial class MainWindow
             var frame = w.State == WanderState.Walk
                 ? n.Frames[(int)(w.WalkTime * fps) % n.Frames.Length]
                 : n.Poses[(int)w.Shown] ?? n.Poses[0]!;                 // dururken: ayakta, oturma, uyuma, yeme, sevinç
+            frame = Lit(frame, soft: true);
             if (!ReferenceEquals(n.Img.Source, frame)) n.Img.Source = frame;
 
             // Etiket: yeni gelen "Yeni!" (tema renginde), selamlaşırken kalp, tıklanınca adı, uyurken "z z".
             const string HeartLabel = "♥";
-            string? label = w.Arriving ? "Yeni!" : w.State == WanderState.Greet ? HeartLabel : w.Held || w.NameTimer > 0 ? n.Name
+            string? label = w.Arriving ? "Yeni!" : w.State == WanderState.Greet ? HeartLabel : w.Held || w.NameTimer > 0 ? NameOf(w.Id)
                 : w.State == WanderState.Idle && w.Shown == ZooPose.Sleep ? "z z" : null;
             if (label == null) { n.Bubble.Visibility = Visibility.Collapsed; continue; }
             if ((string?)n.Bubble.Tag != label)
@@ -725,7 +742,7 @@ public partial class MainWindow
 
         var card = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0xF2, 0xFF, 0xFF, 0xFF)), CornerRadius = new CornerRadius(24),
+            Background = Res("Surface"), CornerRadius = new CornerRadius(24),
             Padding = new Thickness(30, 22, 30, 20), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 60, 0, 0), Effect = (Effect)FindResource("SoftShadow"), Child = p
         };

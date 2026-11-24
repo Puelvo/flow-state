@@ -6,7 +6,7 @@
     <Application.Resources>
         <!--
             TASARIM SİSTEMİ — "Sevimli safari"
-            Açık, sıcak krem zemin; beyaz, bol yuvarlak, yumuşak gölgeli kartlar; basınca çöken "şeker" düğmeler;
+            Renkler AppTheme'den gelir (açık / koyu). Açık temada sıcak krem zemin; beyaz, bol yuvarlak, yumuşak gölgeli kartlar; basınca çöken "şeker" düğmeler;
             Nunito yazı tipi. Vurgu rengi (Accent ve türevleri) kullanıcının seçtiği tema rengidir, ApplyTheme() günceller.
             Ayrıntılar: docs/TASARIM.md
         -->
@@ -15,22 +15,22 @@
 
         <!-- Zemin -->
         <LinearGradientBrush x:Key="BgGrad" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#FFF9F1" Offset="0"/>
+            <GradientStop Color="#FFF9F1" Offset="0"/>   <!-- ApplyTheme temaya göre değiştirir -->
             <GradientStop Color="#FDEBDD" Offset="1"/>
         </LinearGradientBrush>
-        <SolidColorBrush x:Key="Bg" Color="#FFF7EE"/>
+        <SolidColorBrush x:Key="Bg" Color="{Binding [Bg], Source={x:Static local:AppTheme.Instance}}"/>
 
         <!-- Yüzeyler -->
-        <SolidColorBrush x:Key="Surface" Color="#FFFFFF"/>          <!-- kart zemini -->
-        <SolidColorBrush x:Key="Panel" Color="#FFFFFF"/>         <!-- eski ad: kart zemini -->
-        <SolidColorBrush x:Key="Panel2" Color="#FBF0E6"/>        <!-- ikincil yüzey: düğme, giriş kutusu, iz -->
-        <SolidColorBrush x:Key="Line" Color="#F1E3D6"/>          <!-- ince çizgi / kart kenarı -->
-        <SolidColorBrush x:Key="Track" Color="#F4E7DB"/>         <!-- halka ve çubuk izleri -->
+        <SolidColorBrush x:Key="Surface" Color="{Binding [Surface], Source={x:Static local:AppTheme.Instance}}"/>          <!-- kart zemini -->
+        <SolidColorBrush x:Key="Panel" Color="{Binding [Panel], Source={x:Static local:AppTheme.Instance}}"/>         <!-- eski ad: kart zemini -->
+        <SolidColorBrush x:Key="Panel2" Color="{Binding [Panel2], Source={x:Static local:AppTheme.Instance}}"/>        <!-- ikincil yüzey: düğme, giriş kutusu, iz -->
+        <SolidColorBrush x:Key="Line" Color="{Binding [Line], Source={x:Static local:AppTheme.Instance}}"/>          <!-- ince çizgi / kart kenarı -->
+        <SolidColorBrush x:Key="Track" Color="{Binding [Track], Source={x:Static local:AppTheme.Instance}}"/>         <!-- halka ve çubuk izleri -->
 
         <!-- Yazı -->
-        <SolidColorBrush x:Key="Text" Color="#3B2C25"/>          <!-- kakao -->
-        <SolidColorBrush x:Key="Muted" Color="#A08C80"/>
-        <SolidColorBrush x:Key="Faint" Color="#CBB9AC"/>
+        <SolidColorBrush x:Key="Text" Color="{Binding [Text], Source={x:Static local:AppTheme.Instance}}"/>          <!-- kakao -->
+        <SolidColorBrush x:Key="Muted" Color="{Binding [Muted], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="Faint" Color="{Binding [Faint], Source={x:Static local:AppTheme.Instance}}"/>
 
         <!-- Vurgu (tema rengi; ApplyTheme değiştirir) -->
         <SolidColorBrush x:Key="Accent" Color="#5B8CFF"/>
@@ -41,17 +41,24 @@
         <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF"/>      <!-- vurgu zemininde yazı -->
 
         <!-- Durum renkleri -->
-        <SolidColorBrush x:Key="Danger" Color="#EF5D6C"/>
-        <SolidColorBrush x:Key="DangerSoft" Color="#FDE5E7"/>
-        <SolidColorBrush x:Key="Good" Color="#2FB67C"/>
-        <SolidColorBrush x:Key="GoodSoft" Color="#DDF5EA"/>
-        <SolidColorBrush x:Key="Warn" Color="#FFAA3B"/>
-        <SolidColorBrush x:Key="WarnSoft" Color="#FFF0D6"/>
-        <SolidColorBrush x:Key="Coin" Color="#F5B731"/>          <!-- jeton sarısı -->
+        <SolidColorBrush x:Key="Danger" Color="{Binding [Danger], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="DangerSoft" Color="{Binding [DangerSoft], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="Good" Color="{Binding [Good], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="GoodSoft" Color="{Binding [GoodSoft], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="Warn" Color="{Binding [Warn], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="WarnSoft" Color="{Binding [WarnSoft], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="Coin" Color="{Binding [Coin], Source={x:Static local:AppTheme.Instance}}"/>          <!-- jeton sarısı -->
+
+        <!-- Yarı saydam ve yardımcı yüzeyler -->
+        <SolidColorBrush x:Key="Glass" Color="{Binding [Glass], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="Chip" Color="{Binding [Chip], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="CoinInk" Color="{Binding [CoinInk], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="Hover" Color="{Binding [Hover], Source={x:Static local:AppTheme.Instance}}"/>
+        <SolidColorBrush x:Key="Press" Color="{Binding [Press], Source={x:Static local:AppTheme.Instance}}"/>
 
         <!-- Gölgeler -->
-        <DropShadowEffect x:Key="SoftShadow" BlurRadius="26" ShadowDepth="6" Direction="270" Opacity="0.13" Color="#B07A55"/>
-        <DropShadowEffect x:Key="LiftShadow" BlurRadius="34" ShadowDepth="10" Direction="270" Opacity="0.18" Color="#B07A55"/>
+        <DropShadowEffect x:Key="SoftShadow" BlurRadius="26" ShadowDepth="6" Direction="270" Opacity="0.13" Color="{Binding [Shadow], Source={x:Static local:AppTheme.Instance}}"/>
+        <DropShadowEffect x:Key="LiftShadow" BlurRadius="34" ShadowDepth="10" Direction="270" Opacity="0.18" Color="{Binding [Shadow], Source={x:Static local:AppTheme.Instance}}"/>
 
         <!-- Gezinme ikonları (24x24, çizgi) -->
         <Geometry x:Key="IconTimer">M12,5.5 A8,8 0 1 1 11.99,5.5 M12,9.5 L12,13.5 L14.8,15.2 M9.5,2 L14.5,2</Geometry>
@@ -158,10 +165,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#14502A10"/>
+                                <Setter TargetName="bd" Property="Background" Value="{StaticResource Hover}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#22502A10"/>
+                                <Setter TargetName="bd" Property="Background" Value="{StaticResource Press}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="bd" Property="Opacity" Value="0.4"/>
@@ -235,13 +242,14 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="ExtraBold"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Padding" Value="16,9"/>
             <Setter Property="Margin" Value="2,0"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="bd" CornerRadius="18" Background="Transparent" Padding="{TemplateBinding Padding}"
+                        <Border x:Name="bd" CornerRadius="18" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"
                                 RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
                                 <ScaleTransform x:Name="sc" ScaleX="1" ScaleY="1"/>
@@ -273,6 +281,12 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- Üst sekmeler: ortak bar yok, her sekme kendi küçük hapında gökyüzünün üstünde durur -->
+        <Style x:Key="NavChip" TargetType="RadioButton" BasedOn="{StaticResource Nav}">
+            <Setter Property="Background" Value="{StaticResource Chip}"/>
+            <Setter Property="Margin" Value="3,0"/>
         </Style>
 
         <!-- Küçük segment (dönem seçici vb.): Nav ile aynı, daha ufak -->
