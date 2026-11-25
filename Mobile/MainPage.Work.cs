@@ -104,8 +104,9 @@ public partial class MainPage
 		int target = Target;
 		scene.Session = Active; scene.Running = Active && Running;
 		scene.Lit = !Active ? 0 : target > 0 ? Math.Min(1, el / target) * 60 : el % 3600 / 60;
-		int s = target > 0 ? Math.Max(0, target - (int)el) : !Active && data.Countdown ? data.CountdownMinutes * 60 : (int)el;
-		sceneView.Time = $"{s / 3600:00}:{s % 3600 / 60:00}:{s % 60:00}";
+		bool up = target > 0 && el >= target;
+		int s = up ? (int)el - target : target > 0 ? target - (int)el : !Active && data.Countdown ? data.CountdownMinutes * 60 : (int)el;
+		sceneView.Time = up ? $"+{s / 60:00}:{s % 60:00}" : $"{s / 3600:00}:{s % 3600 / 60:00}:{s % 60:00}";
 		sceneView.TimeAlpha = !Active ? 0.4f : Running ? 1f : 0.6f;
 		if (pipsPill.IsVisible && Math.Abs(pipsPill.Margin.Top - pipsTop) > 1) Dispatcher.Dispatch(() => pipsPill.Margin = new Thickness(0, pipsTop, 0, 0));
 		if (modeHost.IsVisible && Math.Abs(modeHost.Margin.Top - modeTop) > 1) Dispatcher.Dispatch(() => modeHost.Margin = new Thickness(0, modeTop, 6, 0));
@@ -172,20 +173,31 @@ public partial class MainPage
 		var course = CurrentCourse;
 		sceneView.Course = course?.Name ?? "Bir ders ekle";
 		var (text, bg, fg, dot) = !Active ? (course == null ? "" : "Başlamaya hazır", Panel2, Muted, Good)
+			: TimeUp ? ("Süre doldu", T("GoodSoft"), Good, Good)
 			: Running ? ("Odaklanıyorsun", accentSoft, accentDeep, accent) : ("Mola", T("WarnSoft"), T("CoinInk"), T("Warn"));
 		sceneView.Status = text; sceneView.StatusBg = U(bg); sceneView.StatusFg = U(fg); sceneView.StatusDot = U(dot);
 
 		// Düğmeler ve mod seçici yalnızca durum değişince kurulur.
 		int laps = Active && Target == 0 ? (int)Elapsed / 3600 : -1;
-		var key = $"{Active}|{Running}|{course != null}|{data.Countdown}|{data.CountdownMinutes}|{laps}|{dark}|{data.WidgetColor}|{startHost.GetHashCode()}";
+		bool up = TimeUp;
+		var key = $"{Active}|{Running}|{up}|{course != null}|{data.Countdown}|{data.CountdownMinutes}|{laps}|{dark}|{data.WidgetColor}|{startHost.GetHashCode()}";
 		if (key == workKey) return;
 		workKey = key;
 
 		startHost.Children.Clear();
-		startHost.Children.Add(PixButton(Active && Running ? "pause" : "play", accent, onAccent, 76, 60, ToggleTimer, course != null ? 1 : 0.35));
 		stopHost.Children.Clear();
 		stopHost.IsVisible = Active;
-		stopHost.Children.Add(PixButton("stop", DangerSoft, Danger, 60, 60, Commit, 1));
+		if (up)
+		{
+			// Süre doldu: akışta kal ya da bitir.
+			startHost.Children.Add(Candy(Row("timer", "Akışta Kal", onAccent, 15, 6), accent, Stay, 54, 17, new Thickness(14, 0)));
+			stopHost.Children.Add(Candy(Row("star", "Bitir ve Kutla", Text, 15, 6), Panel, () => Finish(timeUp: true), 54, 17, new Thickness(14, 0)));
+		}
+		else
+		{
+			startHost.Children.Add(PixButton(Active && Running ? "pause" : "play", accent, onAccent, 76, 60, ToggleTimer, course != null ? 1 : 0.35));
+			stopHost.Children.Add(PixButton("stop", DangerSoft, Danger, 60, 60, Commit, 1));
+		}
 
 		modeHost.Children.Clear();
 		modeHost.IsVisible = !Active;
@@ -337,7 +349,7 @@ public partial class MainPage
 			Spacing = 12, WidthRequest = 270,
 			Children =
 			{
-				Centered("Ne kadar odaklanalım?", 20, true, Text), Centered("Tutamacı çevir; süre dolunca oturum biter.", 13, false, Muted),
+				Centered("Ne kadar odaklanalım?", 20, true, Text), Centered("Süre dolunca bitirir ya da akışta kalırsın.", 13, false, Muted),
 				new Grid { HorizontalOptions = LayoutOptions.Center, Children = { gv, new VerticalStackLayout { InputTransparent = true, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center, Children = { num, unit } } } },
 				quick, buttons
 			}

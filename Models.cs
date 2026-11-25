@@ -95,6 +95,7 @@ public class AppData
     // Bahçe teması (yalnız bu cihazda): "auto" günün saatine göre; "dawn" / "day" / "sunset" / "night" sabit.
     public string GardenTheme { get; set; } = "auto";
 
+    public bool WidgetStrip { get; set; }                                      // masaüstü widget'ı şerit (Sessiz Bakış) görünümünde
     public bool DarkTheme { get; set; }                                        // koyu tema (yalnız bu cihazda)
     public Dictionary<string, string> AnimalNames { get; set; } = new();       // hayvanlara verilen isimler (yalnız bu cihazda)
 }
@@ -161,6 +162,16 @@ public static class Store
         }
         catch { /* disk hatasında uygulama çalışmaya devam etsin */ }
     }
+}
+
+/// <summary>Oturum kuralları (masaüstü ve Android ortak).</summary>
+public static class FlowRules
+{
+    /// <summary>Geri sayım dolunca seçim için beklenen süre; cevap gelmezse oturum hedef süreyle biter.</summary>
+    public const int GraceSeconds = 5 * 60;
+
+    /// <summary>Haber hiç verilemediyse (telefon uyuyordu) bu kadar geciken seçim artık sorulmaz, oturum hedef süreyle biter.</summary>
+    public const int MaxLateSeconds = 30 * 60;
 }
 
 /// <summary>

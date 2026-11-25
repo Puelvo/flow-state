@@ -11,7 +11,7 @@ public partial class MainPage
 	{
 		hexEntry = Field("#RRGGBB"); hexEntry.MaxLength = 7; hexEntry.HorizontalTextAlignment = TextAlignment.Center; hexEntry.WidthRequest = 120;
 		hexEntry.Completed += (_, _) => ApplyHex();
-		var hexRow = new HorizontalStackLayout { Spacing = 10, Children = { Lbl("Özel renk", 14, true, Muted), Boxed(hexEntry) } };
+		var hexRow = new HorizontalStackLayout { Spacing = 10, HorizontalOptions = LayoutOptions.Center, Children = { Lbl("Özel renk", 14, true, Muted), Boxed(hexEntry) } };
 		((View)hexRow.Children[0]).VerticalOptions = LayoutOptions.Center;
 
 		var keepSwitch = new Switch { IsToggled = Preferences.Get("keepOn", false), OnColor = accent, VerticalOptions = LayoutOptions.Center };
@@ -63,19 +63,24 @@ public partial class MainPage
 
 	void RefreshSettings()
 	{
-		swatchRow.Children.Clear();
+		// Beşerli iki sıra, ortalı.
+		swatchRow.Children.Clear(); swatchRow.RowDefinitions.Clear(); swatchRow.ColumnDefinitions.Clear();
+		for (int i = 0; i < 5; i++) swatchRow.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+		int n = 0;
 		var cur = accent;
 		foreach (var hex in ThemeTable.Swatches)
 		{
 			var h = hex; var col = Color.FromArgb(hex);
 			bool on = Math.Abs(col.Red - cur.Red) + Math.Abs(col.Green - cur.Green) + Math.Abs(col.Blue - cur.Blue) < 0.01;
-			var dot = new Border
-			{
-				WidthRequest = 40, HeightRequest = 40, BackgroundColor = col, Margin = new Thickness(0, 0, 10, 10),
-				StrokeShape = new RoundRectangle { CornerRadius = 20 }, StrokeThickness = on ? 4 : 0,
-				Stroke = Text
-			};
-			Tap(dot, () => SetColor(h)); swatchRow.Children.Add(dot);
+			// Seçili rengin halkası hücrenin içinde iç içe dairelerle çizilir; kenarda kırpılmaz.
+			var cell = new Grid { WidthRequest = 52, HeightRequest = 52, HorizontalOptions = LayoutOptions.Center };
+			void Disc(Color c, double size) { var d = Dot(c, size); d.HorizontalOptions = LayoutOptions.Center; d.InputTransparent = true; cell.Children.Add(d); }
+			if (on) { Disc(Text, 50); Disc(Panel, 44); }
+			Disc(col, on ? 36 : 42);
+			Tap(cell, () => SetColor(h));
+			if (n % 5 == 0) swatchRow.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+			swatchRow.Add(cell, n % 5, n / 5);
+			n++;
 		}
 		BuildThemeRows();
 		if (!hexEntry.IsFocused) hexEntry.Text = data.WidgetColor.ToUpperInvariant();

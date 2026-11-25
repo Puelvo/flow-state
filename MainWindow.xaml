@@ -267,7 +267,7 @@
                                     </StackPanel>
                                 </RadioButton>
                                 <RadioButton x:Name="ModeCountdown" GroupName="timermode" Style="{StaticResource Seg}" Checked="Mode_Checked"
-                                             Click="ModeCountdown_Click" ToolTip="Süre seç; süre dolunca oturum kendiliğinden biter">
+                                             Click="ModeCountdown_Click" ToolTip="Süre seç; süre dolunca bitirir ya da akışta kalırsın">
                                     <StackPanel Orientation="Horizontal">
                                         <Path Data="{StaticResource IconHourglass}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.4"/>
                                         <TextBlock x:Name="CountdownLabel" Text="Geri sayım" Margin="6,0,0,0" VerticalAlignment="Center"/>
@@ -688,6 +688,7 @@
                                     <TextBlock Text="Şimdi senkronla" Margin="7,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
+                            <Button Content="Şifre değiştir" Style="{StaticResource Btn}" Margin="0,0,10,0" Click="SyncPasswordChange_Click"/>
                             <Button Content="Çıkış yap" Style="{StaticResource DangerBtn}" Click="SyncLogout_Click"/>
                         </WrapPanel>
                     </StackPanel>
@@ -722,6 +723,9 @@
                 IsHitTestVisible="False" Visibility="Collapsed"/>
         <StackPanel x:Name="WidgetBar" Grid.RowSpan="2" Orientation="Horizontal"
                     HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,6,0" Visibility="Collapsed">
+            <Button Style="{StaticResource Ghost}" Padding="7" ToolTip="Sessiz Bakış: ince şerit" Click="StripToggle_Click">
+                <Path Data="M3,8.5 L21,8.5 L21,15.5 L3,15.5 Z" Style="{StaticResource Icon}" Width="15" Height="14" StrokeThickness="2.2"/>
+            </Button>
             <Button x:Name="PinBtn" Style="{StaticResource Ghost}" Padding="7" ToolTip="Her zaman üstte: kapalı" Click="WidgetPin_Click">
                 <Path Data="{StaticResource IconPin}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.2"/>
             </Button>
@@ -732,6 +736,12 @@
                 <Path Data="{StaticResource IconClose}" Style="{StaticResource Icon}" Width="14" Height="14" StrokeThickness="2.2"/>
             </Button>
         </StackPanel>
+        <!-- Sessiz Bakış: widget'ın ince şerit hâli (MainWindow.Strip.cs kurar) -->
+        <Grid x:Name="StripHost" Grid.RowSpan="2" Panel.ZIndex="20" Background="Transparent" Visibility="Collapsed"/>
+
+        <!-- Geri sayım dolunca: Akışta Kal / Bitir ve Kutla (MainWindow.Flow.cs). Zemini yok; sayfa kullanılabilir kalır. -->
+        <Grid x:Name="ChoiceLayer" Grid.RowSpan="2" Panel.ZIndex="80"/>
+
         <!-- Geri sayım süre kadranı: karartılmış zemin + ortada kart (MainWindow.Dial.cs) -->
         <Grid x:Name="DialLayer" Grid.RowSpan="2" Panel.ZIndex="90" Visibility="Collapsed"/>
 

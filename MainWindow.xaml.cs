@@ -42,6 +42,7 @@ public partial class MainWindow : Window
         SourceInitialized += (_, _) => AppTheme.TitleBar(this);
         RingHost.LayoutTransform = NormalRingScale;
         BuildSunScene();
+        BuildFlowChoice();
         data.CountdownMinutes = Math.Clamp(data.CountdownMinutes, DialMin, DialMax);
         if (data.Countdown) ModeCountdown.IsChecked = true;
 
@@ -333,6 +334,7 @@ public partial class MainWindow : Window
 
     void ToggleTimer()
     {
+        if (TimeUp) return;                                      // seçim bekleniyor (Akışta Kal / Bitir)
         if (!active)
         {
             var c = SelectedCourse;
@@ -494,12 +496,7 @@ public partial class MainWindow : Window
         if (s == lastTickSecond) return;
         lastTickSecond = s;
 
-        if (active && countdownTarget > 0 && sw.IsRunning && s >= countdownTarget)
-        {
-            System.Media.SystemSounds.Asterisk.Play();
-            FinishSession(timeUp: true);
-            return;
-        }
+        if (TickTimeUp(s)) return;
 
         if (active)
         {
@@ -646,7 +643,8 @@ public partial class MainWindow : Window
         SetBreathing(active && sw.IsRunning);
 
         int es = ActiveSeconds;
-        ElapsedText.Text = countdownTarget > 0 ? Clock(Math.Max(0, countdownTarget - es))
+        ElapsedText.Text = TimeUp ? $"+{Clock(es - countdownTarget)[3..]}"                // seçim beklerken geçen süre
+            : countdownTarget > 0 ? Clock(Math.Max(0, countdownTarget - es))
             : !active && data.Countdown ? Clock(data.CountdownMinutes * 60)
             : Clock(es);
         // Mod seçici yalnızca oturum yokken görünür; widget'ta hiç yok.
@@ -655,6 +653,8 @@ public partial class MainWindow : Window
         CountdownLabel.Text = data.Countdown ? $"Geri sayım · {data.CountdownMinutes} dk" : "Geri sayım";
         ElapsedText.Opacity = !active ? 0.4 : sw.IsRunning ? 1 : 0.6;
 
+        UpdateFlowChoice();
+        UpdateStrip();
         UpdateRing();
         UpdatePips();
         // Boş yıldız satırı ve boş etiket yer kaplamasın (düğmeler kaydırmadan görünsün).
@@ -1145,6 +1145,7 @@ public partial class MainWindow : Window
     void SetWidgetMode(bool on)
     {
         if (on == widgetMode) return;
+        if (!on) SetStrip(false, remember: false);
         widgetMode = on;
 
         if (on)
@@ -1235,6 +1236,7 @@ public partial class MainWindow : Window
             Left = normalBounds.X; Top = normalBounds.Y;
             Width = normalBounds.Width; Height = normalBounds.Height;
         }
+        if (on && data.WidgetStrip) SetStrip(true, remember: false);
         UpdateAll();
     }
 

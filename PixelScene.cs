@@ -17,6 +17,7 @@ public sealed class PixelScene
     public int Horizon, SunX, SunY;
     public double PathAt = 0.58;                  // patikanın çimendeki yüksekliği (0 ufuk, 1 alt)
     public bool ShowClouds = true, ShowSun = true;
+    public bool Quiet;                            // yalnız patika, gezgin ve jeep: süs, kuş, kelebek yok (şerit widget)
     public int CloudZ = 2;
 
     // Durum (arayüz doldurur)
@@ -202,13 +203,15 @@ public sealed class PixelScene
 
     void BuildDecor()
     {
-        var key = $"{W}|{H}|{Horizon}|{treeStage}|{treeBare}|{string.Join(",", decors)}";
+        var key = $"{W}|{H}|{Horizon}|{treeStage}|{treeBare}|{Quiet}|{string.Join(",", decors)}";
         if (key == decorKey) return;
         decorKey = key; groundKey = "";
         props.Clear(); meerkats.Clear();
         World.Blocks.Clear(); fire = swing = null;
         double ww = World.Width, top = World.Top, bottom = World.Bottom, band = Math.Max(40, bottom - top);
         World.PathY = x => top + band * PathAt + Math.Min(16, band * 0.06) * Math.Sin(x / 160 + 1);
+
+        if (Quiet) { crown = default; World.Pond = null; World.Shade = null; return; }
 
         void Put(PixImg img, double left, double y, double order, int anim = 0) => props.Add(new Prop(img, left, y, (int)order, anim));
 
@@ -451,6 +454,23 @@ public sealed class PixelScene
 
         for (int i = 0; i < cloudU.Length; i++) cloudU[i] = (cloudU[i] + PixelArt.CloudSet[i].Speed * dt / (W / U + 380)) % 1;
 
+        if (!Quiet) Ambient(dt);
+        if (World.JeepV > 22 && (dustTimer -= dt) <= 0)
+        {
+            dustTimer = 0.16;
+            int dir = World.JeepRight ? 1 : -1;
+            dust.Add((World.JeepX - dir * 73 + rnd.Next(-4, 5), World.JeepY - 6 + rnd.Next(-3, 4), 0.7));
+        }
+        for (int i = dust.Count - 1; i >= 0; i--)
+        {
+            var (x, y, l) = dust[i];
+            if ((l -= dt) <= 0) dust.RemoveAt(i); else dust[i] = (x, y - 14 * dt, l);
+        }
+    }
+
+    /// <summary>Kelebek, kuş, yaprak, mirket ve baykuş.</summary>
+    void Ambient(double dt)
+    {
         bool night = Palette.Moon >= 0.5, day = Palette.Stars < 0.3 && Palette.Fireflies < 0.2;
         double ww = World.Width, top = World.Top;
         int bugs = day ? 4 : 0;
@@ -499,17 +519,6 @@ public sealed class PixelScene
             if (m.Phase == 2) m.Left = rnd.Next(2) == 0;
         }
         if ((owlBlink -= dt) <= 0) owlBlink = 3 + rnd.NextDouble() * 3;
-        if (World.JeepV > 22 && (dustTimer -= dt) <= 0)
-        {
-            dustTimer = 0.16;
-            int dir = World.JeepRight ? 1 : -1;
-            dust.Add((World.JeepX - dir * 73 + rnd.Next(-4, 5), World.JeepY - 6 + rnd.Next(-3, 4), 0.7));
-        }
-        for (int i = dust.Count - 1; i >= 0; i--)
-        {
-            var (x, y, l) = dust[i];
-            if ((l -= dt) <= 0) dust.RemoveAt(i); else dust[i] = (x, y - 14 * dt, l);
-        }
     }
 
     // ---------- kare ----------
@@ -555,7 +564,7 @@ public sealed class PixelScene
         if (ShowSun) DrawSun();
         DrawItems(moon);
 
-        if (Palette.Fireflies > 0.02)
+        if (Palette.Fireflies > 0.02 && !Quiet)
             foreach (var (fx, fy, ph) in flies)
             {
                 double x = fx * W + Math.Sin(time * 0.8 + ph) * 14 * Z, y = Horizon + 8 * Z + fy * Math.Max(10, (H - Horizon) * 0.7) + Math.Cos(time + ph * 2) * 9 * Z;
@@ -605,7 +614,7 @@ public sealed class PixelScene
                 Blit(Lit_(q.Img, 0), Sx(q.X), Sy(q.Y), Z, alpha: a);
             }));
         }
-        if (moon >= 0.5)
+        if (moon >= 0.5 && crown.W > 0)
             items.Add(((int)World.Top + 41, () => Blit(PixelArt.Owl()[owlBlink < 0.18 ? 1 : 0], Sx(crown.X + crown.W / 2 + 30), Sy(treeTop - 12), Z)));
         foreach (var m in meerkats)
         {

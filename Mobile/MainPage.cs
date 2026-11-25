@@ -30,7 +30,8 @@ public partial class MainPage : ContentPage
 	View[] views = new View[NavCount];
 	Border[] navItems = new Border[NavCount];
 	VerticalStackLayout statsBox = null!, historyBox = null!, courseBox = null!, accountBox = null!, themeBox = null!;
-	FlexLayout swatchRow = null!, gardenRow = null!;
+	Grid swatchRow = null!;
+	FlexLayout gardenRow = null!;
 	Entry hexEntry = null!;
 	int tab;
 	readonly IDispatcherTimer ticker;
@@ -63,7 +64,7 @@ public partial class MainPage : ContentPage
 		ApplyTheme();
 		mailBox = passBox = null;
 		statsBox = new() { Spacing = 10 }; historyBox = new() { Spacing = 8 }; courseBox = new() { Spacing = 8 }; accountBox = new() { Spacing = 10 }; themeBox = new();
-		swatchRow = new() { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap }; gardenRow = new() { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
+		swatchRow = new() { RowSpacing = 8 }; gardenRow = new() { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
 
 		body = new Grid();
 		views = new View[NavCount];

@@ -17,6 +17,7 @@ public partial class MainWindow
     void ShowCoinReward(Session s, bool timeUp, Special? special = null, string? growth = null)
     {
         int coins = Zoo.SessionCoins(s);
+        if (stripMode) { StripReward(coins, special); return; }
         var course = data.Courses.FirstOrDefault(c => c.Id == s.CourseId)?.Name ?? "";
         FxLayer.UpdateLayout();
         var center = RewardOrigin();

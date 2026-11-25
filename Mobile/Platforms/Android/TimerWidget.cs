@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Android.App;
 using Android.Appwidget;
 using Android.Content;
@@ -99,6 +99,7 @@ public static class TimerWidget
 			var palette = DayCycle.At(DateTime.Now, DayCycle.Parse(data.GardenTheme));
 			double lit = !active ? 0 : target > 0 ? Math.Min(1, elapsed / target) * 60 : elapsed % 3600 / 60;
 			bool nightSky = DayCycle.IsNight(palette);
+			bool up = target > 0 && elapsed >= target;                    // geri sayım doldu, seçim bekleniyor
 
 			foreach (var id in ids)
 			{
@@ -116,14 +117,14 @@ public static class TimerWidget
 				v.SetTextColor(Id("w_course"), Col(fg)); v.SetTextColor(Id("w_time"), Col(fg)); v.SetTextColor(Id("w_status"), Col(sub));
 				if (OperatingSystem.IsAndroidVersionAtLeast(24)) v.SetChronometerCountDown(Id("w_time"), target > 0);
 				long now = SystemClock.ElapsedRealtime();
-				v.SetChronometer(Id("w_time"), target > 0 ? now + (long)((target - elapsed) * 1000) : now - (long)(elapsed * 1000), null, running);
+				v.SetChronometer(Id("w_time"), up ? now : target > 0 ? now + (long)((target - elapsed) * 1000) : now - (long)(elapsed * 1000), null, running && !up);
 				v.SetTextViewText(Id("w_course"), course?.Name ?? "Ders ekle");
-				v.SetTextViewText(Id("w_status"), !active ? $"Bugün {Fmt(todaySec)}" : running ? "Odaklanıyorsun" : "Mola");
+				v.SetTextViewText(Id("w_status"), !active ? $"Bugün {Fmt(todaySec)}" : up ? "Süre doldu · devam mı?" : running ? "Odaklanıyorsun" : "Mola");
 
-				v.SetImageViewBitmap(Id("w_toggle"), ButtonBitmap(active && running ? "pause" : "play", accent, OnAccent(accent), 28, 20));
+				v.SetImageViewBitmap(Id("w_toggle"), ButtonBitmap(active && running && !up ? "pause" : "play", accent, OnAccent(accent), 28, 20));
 				v.SetImageViewBitmap(Id("w_stop"), ButtonBitmap("stop", 0xFFFDE5E7, 0xFFEF5D6C, 22, 20));
 				v.SetViewVisibility(Id("w_stop"), active ? Android.Views.ViewStates.Visible : Android.Views.ViewStates.Gone);
-				v.SetOnClickPendingIntent(Id("w_toggle"), Broadcast(TimerNotifier.ActToggle, 21));
+				v.SetOnClickPendingIntent(Id("w_toggle"), up ? Broadcast(TimerNotifier.ActStay, 23) : Broadcast(TimerNotifier.ActToggle, 21));
 				v.SetOnClickPendingIntent(Id("w_stop"), Broadcast(TimerNotifier.ActFinish, 22));
 				var open = new Intent(ctx, typeof(MainActivity)).SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
 				v.SetOnClickPendingIntent(Id("w_root"), PendingIntent.GetActivity(ctx, 20, open, PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent));

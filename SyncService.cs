@@ -138,8 +138,49 @@ public sealed class SyncService
         catch (Exception ex) { return "Bağlanılamadı: " + ex.Message; }
     }
 
+    /// <summary>
+    /// Açık oturumun şifresini değiştirir. Hata yoksa Error null. Supabase ek doğrulama isterse NeedsCode true döner ve
+    /// e-postaya kod gönderilir; kodla yeniden çağrılır.
+    /// </summary>
+    public async Task<(string? Error, bool NeedsCode)> ChangePasswordAsync(string password, string code = "")
+    {
+        try
+        {
+            if (!SignedIn) return ("Önce giriş yap.", false);
+            if (!await EnsureTokenAsync()) return (SignedIn ? "Bağlantı yok, sonra tekrar dene." : "Oturum süresi dolmuş, yeniden giriş yapman gerekiyor.", false);
+            var body = new JsonObject { ["password"] = password };
+            if (code.Length > 0) body["nonce"] = code;
+            var (ok, err, kind) = await AuthCallAsync(HttpMethod.Put, "user", body);
+            if (ok) return (null, false);
+            if (kind == "reauthentication_needed")
+            {
+                var (sent, sendErr, _) = await AuthCallAsync(HttpMethod.Get, "reauthenticate", null);
+                return sent ? ("Güvenlik için e-postana bir kod gönderdik. Kodu yazıp yeniden kaydet.", true) : (TranslateAuthError(sendErr), false);
+            }
+            if (kind is "reauthentication_not_valid" or "otp_expired") return ("Kod hatalı ya da süresi dolmuş.", true);
+            return (TranslateAuthError(err), false);
+        }
+        catch (Exception ex) { return ("Bağlanılamadı: " + ex.Message, false); }
+    }
+
+    /// <summary>Oturumla bir kimlik isteği yapar; gövde ve yanıt kaydedilmez.</summary>
+    async Task<(bool Ok, string Error, string Kind)> AuthCallAsync(HttpMethod method, string path, JsonObject? body)
+    {
+        using var req = new HttpRequestMessage(method, $"{BaseUrl}/auth/v1/{path}");
+        if (body != null) req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        req.Headers.Add("apikey", ApiKey);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        using var res = await Http.SendAsync(req);
+        if (res.IsSuccessStatusCode) return (true, "", "");
+        JsonObject? o = null;
+        try { o = JsonNode.Parse(await res.Content.ReadAsStringAsync()) as JsonObject; } catch { }
+        return (false, o?["msg"]?.ToString() ?? o?["message"]?.ToString() ?? $"Sunucu hatası ({(int)res.StatusCode}).", o?["error_code"]?.ToString() ?? "");
+    }
+
     static string TranslateAuthError(string m)
     {
+        if (m.Contains("different from the old", StringComparison.OrdinalIgnoreCase)) return "Yeni şifre eskisiyle aynı olamaz.";
+        if (m.Contains("weak", StringComparison.OrdinalIgnoreCase)) return "Şifre çok zayıf. Daha uzun ya da daha karışık bir şifre seç.";
         if (m.Contains("Invalid login", StringComparison.OrdinalIgnoreCase)) return "E-posta veya şifre hatalı.";
         if (m.Contains("already", StringComparison.OrdinalIgnoreCase)) return "Bu e-posta zaten kayıtlı. Giriş yapmayı dene.";
         if (m.Contains("at least", StringComparison.OrdinalIgnoreCase)) return "Şifre en az 6 karakter olmalı.";

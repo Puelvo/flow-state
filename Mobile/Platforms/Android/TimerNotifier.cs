@@ -1,4 +1,4 @@
-using Android.App;
+﻿using Android.App;
 using Android.Content;
 using Android.OS;
 using Android.Widget;
@@ -10,10 +10,12 @@ namespace FlowState.Mobile;
 public static class TimerNotifier
 {
 	const string ChannelId = "timer";
-	const int NotifId = 1;
+	const int NotifId = 1, ChoiceId = 3;
 	public const string ActToggle = "com.puelvo.flowstate.TOGGLE";
 	public const string ActFinish = "com.puelvo.flowstate.FINISH";
 	public const string ActTimeUp = "com.puelvo.flowstate.TIMEUP";
+	public const string ActStay = "com.puelvo.flowstate.STAY";
+	public const string ActAutoEnd = "com.puelvo.flowstate.AUTOEND";
 
 	static Context Ctx => Android.App.Application.Context;
 
@@ -45,7 +47,8 @@ public static class TimerNotifier
 			var openIntent = new Intent(ctx, typeof(MainActivity)).SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
 			var open = PendingIntent.GetActivity(ctx, 0, openIntent, PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent);
 
-				string title = string.IsNullOrEmpty(course) ? "Flow State" : course;
+				bool up = target > 0 && elapsedSec >= target;                // geri sayım doldu, seçim bekleniyor
+				string title = (string.IsNullOrEmpty(course) ? "Flow State" : course) + (up ? " · süre doldu" : "");
 
 				Store.Dir = Microsoft.Maui.Storage.FileSystem.AppDataDirectory;
 				var data = Store.Load();
@@ -61,11 +64,11 @@ public static class TimerNotifier
 				v.SetTextViewText(Id("n_course"), title);
 				v.SetTextColor(Id("n_time"), TimerWidget.Col(fg)); v.SetTextColor(Id("n_course"), TimerWidget.Col(fg));
 				if (OperatingSystem.IsAndroidVersionAtLeast(24)) v.SetChronometerCountDown(Id("n_time"), target > 0);
-				long baseMs = SystemClock.ElapsedRealtime() + (long)((target > 0 ? target - elapsedSec : -elapsedSec) * 1000);
-				v.SetChronometer(Id("n_time"), baseMs, null, running);
-				v.SetImageViewBitmap(Id("n_toggle"), TimerWidget.ButtonBitmap(running ? "pause" : "play", accent, TimerWidget.OnAccent(accent), 26, 20));
+				long baseMs = SystemClock.ElapsedRealtime() + (long)((up ? 0 : target > 0 ? target - elapsedSec : -elapsedSec) * 1000);
+				v.SetChronometer(Id("n_time"), baseMs, null, running && !up);
+				v.SetImageViewBitmap(Id("n_toggle"), TimerWidget.ButtonBitmap(running && !up ? "pause" : "play", accent, TimerWidget.OnAccent(accent), 26, 20));
 				v.SetImageViewBitmap(Id("n_stop"), TimerWidget.ButtonBitmap("stop", 0xFFFDE5E7, 0xFFEF5D6C, 22, 20));
-				v.SetOnClickPendingIntent(Id("n_toggle"), Broadcast(ActToggle, 1));
+				v.SetOnClickPendingIntent(Id("n_toggle"), up ? Broadcast(ActStay, 5) : Broadcast(ActToggle, 1));
 				v.SetOnClickPendingIntent(Id("n_stop"), Broadcast(ActFinish, 2));
 
 				var b = new NotificationCompat.Builder(ctx, ChannelId)
@@ -85,31 +88,74 @@ public static class TimerNotifier
 		catch { /* izin verilmediyse ya da cihaz reddederse uygulama çalışmaya devam eder */ }
 	}
 
-	/// <summary>Geri sayımın bitişi için uyandırma kurar (saniye &lt; 0: iptal). Uygulama kapalıyken de oturum zamanında biter.</summary>
-	public static void ScheduleEnd(double seconds)
+	/// <summary>
+	/// Geri sayım uyandırmaları: remaining süre dolunca (seçim sorulur), autoEnd soru gösterildikten sonra (kendiliğinden biter).
+	/// null olan iptal edilir. Uygulama kapalıyken de çalışır.
+	/// </summary>
+	public static void ScheduleEnd(double? remaining, double? autoEnd = null)
 	{
 		try
 		{
 			if (Ctx.GetSystemService(Context.AlarmService) is not AlarmManager am) return;
-			var pi = Broadcast(ActTimeUp, 3);
-			if (seconds < 0) { am.Cancel(pi); return; }
-			am.SetAndAllowWhileIdle(AlarmType.ElapsedRealtimeWakeup, SystemClock.ElapsedRealtime() + (long)(seconds * 1000) + 300, pi);
+			Set(Broadcast(ActTimeUp, 3), remaining);
+			Set(Broadcast(ActAutoEnd, 6), autoEnd);
+
+			void Set(PendingIntent pi, double? sec)
+			{
+				if (sec is not { } s) { am.Cancel(pi); return; }
+				s = Math.Max(0, s);
+				am.SetAndAllowWhileIdle(AlarmType.ElapsedRealtimeWakeup, SystemClock.ElapsedRealtime() + (long)(s * 1000) + 300, pi);
+			}
 		}
 		catch { }
 	}
 
-	/// <summary>Geri sayım uygulama arkadayken bitti: sesli, kısa bir bildirim.</summary>
+	/// <summary>Uygulama açıkken: cihazın bildirim sesi, kısa.</summary>
+	public static void Chime()
+	{
+		try { Android.Media.RingtoneManager.GetRingtone(Ctx, Android.Media.RingtoneManager.GetDefaultUri(Android.Media.RingtoneType.Notification))?.Play(); } catch { }
+	}
+
+	const string DoneChannel = "timer_done";
+
+	static void EnsureDoneChannel()
+	{
+		if (OperatingSystem.IsAndroidVersionAtLeast(26) && Ctx.GetSystemService(Context.NotificationService) is NotificationManager nm && nm.GetNotificationChannel(DoneChannel) == null)
+			nm.CreateNotificationChannel(new NotificationChannel(DoneChannel, "Süre doldu", NotificationImportance.High));
+	}
+
+	static PendingIntent? OpenApp(int code) =>
+		PendingIntent.GetActivity(Ctx, code, new Intent(Ctx, typeof(MainActivity)).SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop), PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent);
+
+	/// <summary>Süre doldu, uygulama arkada: "Akışta Kal" ve "Bitir ve Kutla" düğmeli bildirim.</summary>
+	public static void ShowChoice()
+	{
+		try
+		{
+			EnsureDoneChannel();
+			var b = new NotificationCompat.Builder(Ctx, DoneChannel)
+				.SetSmallIcon(Ctx.ApplicationInfo!.Icon)!.SetContentTitle("Süre doldu")!.SetContentText("Akıştaysan bölme; süren aynı oturuma eklenir.")!
+				.AddAction(0, "Akışta Kal", Broadcast(ActStay, 7))!.AddAction(0, "Bitir ve Kutla", Broadcast(ActFinish, 8))!
+				.SetAutoCancel(true)!.SetPriority(NotificationCompat.PriorityHigh)!.SetTimeoutAfter(FlowRules.GraceSeconds * 1000L)!.SetContentIntent(OpenApp(9))!;
+			NotificationManagerCompat.From(Ctx)!.Notify(ChoiceId, b.Build()!);
+		}
+		catch { }
+	}
+
+	public static void CancelChoice()
+	{
+		try { NotificationManagerCompat.From(Ctx)!.Cancel(ChoiceId); } catch { }
+	}
+
+	/// <summary>Seçim yapılmadı, oturum hedef süreyle kendiliğinden bitti.</summary>
 	public static void ShowDone()
 	{
 		try
 		{
-			const string ch = "timer_done";
-			if (OperatingSystem.IsAndroidVersionAtLeast(26) && Ctx.GetSystemService(Context.NotificationService) is NotificationManager nm && nm.GetNotificationChannel(ch) == null)
-				nm.CreateNotificationChannel(new NotificationChannel(ch, "Süre doldu", NotificationImportance.High));
-			var open = PendingIntent.GetActivity(Ctx, 4, new Intent(Ctx, typeof(MainActivity)).SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop), PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent);
-			var b = new NotificationCompat.Builder(Ctx, ch)
-				.SetSmallIcon(Ctx.ApplicationInfo!.Icon)!.SetContentTitle("Süre doldu!")!.SetContentText("Oturumun kaydedildi; bahçende kutlama var.")!
-				.SetAutoCancel(true)!.SetPriority(NotificationCompat.PriorityHigh)!.SetContentIntent(open)!;
+			EnsureDoneChannel();
+			var b = new NotificationCompat.Builder(Ctx, DoneChannel)
+				.SetSmallIcon(Ctx.ApplicationInfo!.Icon)!.SetContentTitle("Oturumun kaydedildi")!.SetContentText("Süre dolmuştu; bahçende kutlama var.")!
+				.SetAutoCancel(true)!.SetPriority(NotificationCompat.PriorityHigh)!.SetContentIntent(OpenApp(4))!;
 			NotificationManagerCompat.From(Ctx)!.Notify(NotifId + 1, b.Build()!);
 		}
 		catch { }
@@ -121,16 +167,14 @@ public static class TimerNotifier
 	}
 }
 
-/// <summary>Bildirimdeki ve widget'taki Duraklat / Bitir düğmeleri; geri sayımın bitişi.</summary>
+/// <summary>Bildirimdeki ve widget'taki düğmeler (duraklat, bitir, akışta kal) ve geri sayım uyandırmaları.</summary>
 [BroadcastReceiver(Enabled = true, Exported = false)]
 public class TimerActionReceiver : BroadcastReceiver
 {
 	public override void OnReceive(Context? context, Intent? intent)
 	{
-		var finish = intent?.Action is TimerNotifier.ActFinish or TimerNotifier.ActTimeUp;
-		if (!finish && intent?.Action != TimerNotifier.ActToggle) return;
-		if (intent?.Action == TimerNotifier.ActTimeUp && Microsoft.Maui.Storage.Preferences.Get("run", "").Length > 0) TimerNotifier.ShowDone();
-		if (MainPage.Current is { } page) page.ExternalAction(finish);
-		else MainPage.Headless(finish); // uygulama süreci kapalıyken doğrudan kayıtlar üzerinde işlem yapar
+		if (intent?.Action is not (TimerNotifier.ActToggle or TimerNotifier.ActFinish or TimerNotifier.ActStay or TimerNotifier.ActTimeUp or TimerNotifier.ActAutoEnd)) return;
+		if (MainPage.Current is { } page) page.ExternalAction(intent.Action);
+		else MainPage.Headless(intent.Action); // uygulama süreci kapalıyken doğrudan kayıtlar üzerinde işlem yapar
 	}
 }

@@ -19,6 +19,11 @@ public partial class MainWindow
             text = course == null ? "" : "Başlamaya hazır";
             (bg, fg, dot) = ("Panel2", "Muted", "Good");
         }
+        else if (TimeUp)
+        {
+            text = "Süre doldu";
+            (bg, fg, dot) = ("GoodSoft", "Good", "Good");
+        }
         else if (!sw.IsRunning)
         {
             text = "Kısa bir mola";
